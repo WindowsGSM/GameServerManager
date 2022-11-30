@@ -1,0 +1,250 @@
+﻿@page "/servers"
+@inject NavigationManager NavManager
+@inject GameServerService GameServerService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@implements IDisposable
+
+<MudContainer Class="mt-6 mb-6" MaxWidth="MaxWidth.ExtraLarge">
+    <MudText Typo="Typo.h3">Servers</MudText>
+    <MudText Typo="Typo.subtitle1" Class="mb-4">All servers | @GameServerService.Instances.Count total</MudText>
+
+    <MudButton @onclick="OpenInstallDialog" Variant="Variant.Filled" Color="Color.Primary" Class="mr-1">
+        Install Game Server
+    </MudButton>
+
+    <MudButton @onclick="OpenImportDialog" Variant="Variant.Filled" Color="Color.Warning">
+        Import Game Server
+    </MudButton>
+
+    <MudTable Items="@GameServerService.Instances" Dense="true" MultiSelection="false" @bind-SelectedItems="_selectedServers" Hover="true" Class="mt-6 mb-6">
+        <HeaderContent>
+            <MudTh>Game</MudTh>
+            <MudTh>PID</MudTh>
+            <MudTh>Status</MudTh>
+            <MudTh>Name</MudTh>
+            <MudTh>Map</MudTh>
+            <MudTh>Players</MudTh>
+            <MudTh>Uptime</MudTh>
+            <MudTh></MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Game">
+                <MudTooltip Text="@context.Name" Placement="Placement.Right">
+                    <MudImage Src="@context.ImageSource" Alt="@context.Config.ClassName" Elevation="2" Class="rounded-lg" Width="24" />
+                </MudTooltip>
+            </MudTd>
+            <MudTd DataLabel="PID">@context.Process.Id</MudTd>
+            <MudTd DataLabel="Status">
+                <MudChip Variant="Variant.Outlined" Size="Size.Small" Color="@context.Status.ToColor()">@context.Status.ToStringEx()</MudChip>
+            </MudTd>
+            <MudTd DataLabel="Name">@context.Config.Basic.Name</MudTd>
+            <MudTd DataLabel="Map">@GameServerService.GetResponse(context)?.MapName</MudTd>
+            <MudTd DataLabel="Players">
+                @if (context.Config is IProtocolConfig protocolConfig)
+                {
+                    var response = GameServerService.GetResponse(context);
+
+                    if (response != null)
+                    {
+                        <span>@response.Player / @response.MaxPlayer</span>
+                    }
+                }
+            </MudTd>
+            <MudTd DataLabel="Uptime">@UptimeString(context.Process.StartTime)</MudTd>
+            <MudTd Style="text-align:right">
+                @*if (context.ProcessConsole.Mode == ProcessConsole.ConsoleType.Windowed)
+                {
+                    <MudTooltip Text="Toggle Console">
+                        <MudIconButton Icon="@Icons.Material.Filled.Tab" Color="Color.Inherit" OnClick="@((e) => NavigateToConsole(context.Config.Guid))" />
+                    </MudTooltip>
+                }
+                else
+                {
+                    <MudTooltip Text="Console">
+                        <MudIconButton Icon="@Icons.Material.Filled.Terminal" Color="Color.Inherit" OnClick="@((e) => NavigateToConsole(context.Config.Guid))" />
+                    </MudTooltip>
+                }*@
+
+                @if (@context.Status == Status.NotInstalled || @context.Status == Status.Stopped)
+                {
+                    <MudTooltip Text="Start">
+                        <MudIconButton Icon="@Icons.Material.Filled.PlayArrow" Color="Color.Success" OnClick="@((e) => Start(context))" Disabled="@context.Status.IsDisabled(Operation.Start)" />
+                    </MudTooltip>
+                }
+                else
+                {
+                    <MudTooltip Text="Stop">
+                        <MudIconButton Icon="@Icons.Material.Filled.Stop" Color="Color.Warning" OnClick="@((e) => Stop(context))" Disabled="@context.Status.IsDisabled(Operation.Stop)" />
+                    </MudTooltip>
+                }
+
+                <MudTooltip Text="Restart">
+                    <MudMenu Dense="true" ActivationEvent="@MouseEvent.RightClick" ListClass="pa-0" PopoverClass="rounded-circle">
+                        <ActivatorContent>
+                            <MudTooltip> @* Need to keep this *@
+                                <MudIconButton Icon="@Icons.Material.Filled.RestartAlt" Color="Color.Info" OnClick="@((e) => Restart(context))" Disabled="@(context.Status != Status.Started)" />
+                            </MudTooltip>
+                        </ActivatorContent>
+                        <ChildContent>
+                            <MudIconButton Icon="@Icons.Material.Filled.Close" Color="Color.Error" OnClick="@((e) => Kill(context))" Disabled="@context.Status.IsDisabled(Operation.Kill)" Title="Kill" />
+                        </ChildContent>
+                    </MudMenu>
+                </MudTooltip>
+
+                <MudTooltip Text="Control Panel">
+                    <MudIconButton Icon="@Icons.Material.Filled.DisplaySettings" Color="Color.Inherit" OnClick="@((e) => NavigateToControlPanel(context.Config.Guid))" />
+                </MudTooltip>
+            </MudTd>
+        </RowTemplate>
+    </MudTable>
+</MudContainer>
+
+@code {
+    private HashSet<IGameServer> _selectedServers = new();
+    private Timer? timer;
+
+    protected override void OnInitialized()
+    {
+        GameServerService.GameServersHasChanged += () => InvokeAsync(StateHasChanged);
+        timer = new Timer((state) => InvokeAsync(StateHasChanged), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+    }
+
+    public void Dispose()
+    {
+        timer?.Dispose();
+    }
+
+    private string UptimeString(DateTime? startTime)
+    {
+        if (startTime == null)
+        {
+            return "0:00:00:00";
+        }
+
+        TimeSpan t = TimeSpan.FromSeconds((DateTime.Now - startTime.Value).TotalSeconds);
+
+        return string.Format("{0}:{1:D2}:{2:D2}:{3:D2}", (int)t.TotalDays, t.Hours, t.Minutes, t.Seconds);
+    }
+
+    private async Task Start(IGameServer gameServer)
+    {
+        try
+        {
+            await gameServer.StartAsync();
+            Snackbar.Add($"{gameServer.Config.Basic.Name}: Started", Severity.Success);
+        }
+        catch (Exception e)
+        {
+            Snackbar.Add($"{gameServer.Config.Basic.Name}: Fail to Started - {e.Message}", Severity.Error);
+        }
+    }
+
+    private async Task Stop(IGameServer gameServer)
+    {
+        try
+        {
+            await gameServer.StopAsync();
+            Snackbar.Add($"{gameServer.Config.Basic.Name}: Stopped", Severity.Success);
+        }
+        catch (Exception e)
+        {
+            Snackbar.Add($"{gameServer.Config.Basic.Name}: Fail to Stop - {e.Message}", Severity.Error);
+        }
+    }
+
+    private async Task Restart(IGameServer gameServer)
+    {
+        try
+        {
+            await gameServer.RestartAsync();
+            Snackbar.Add($"{gameServer.Config.Basic.Name}: Restarted", Severity.Success);
+        }
+        catch (Exception e)
+        {
+            Snackbar.Add($"{gameServer.Config.Basic.Name}: Fail to Restart - {e.Message}", Severity.Error);
+        }
+    }
+
+    private async Task Kill(IGameServer gameServer)
+    {
+        try
+        {
+            await gameServer.KillAsync();
+            Snackbar.Add($"{gameServer.Config.Basic.Name}: Killed", Severity.Success);
+        }
+        catch (Exception e)
+        {
+            Snackbar.Add($"{gameServer.Config.Basic.Name}: Fail to Kill - {e.Message}", Severity.Error);
+        }
+    }
+
+    private async void OpenInstallDialog()
+    {
+        DialogOptions options = new()
+        {
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true,
+            CloseButton = true,
+            CloseOnEscapeKey = true,
+            DisableBackdropClick = true,
+        };
+
+        IDialogReference dialogReference = DialogService.Show<GameServerInstallDialog>("Install Game Server", options);
+        DialogResult dialogResult = await dialogReference.Result;
+
+        if (dialogResult.Cancelled)
+        {
+            return;
+        }
+
+        Dictionary<string, object> data = (Dictionary<string, object>)dialogResult.Data;
+        IGameServer gameServer = (IGameServer)data["GameServer"];
+        string version = data["Version"].ToString()!;
+
+        try
+        {
+            await gameServer.InstallAsync(version);
+            Snackbar.Add($"{gameServer.Config.Basic.Name}: Installed", Severity.Success);
+        }
+        catch (Exception e)
+        {
+            Snackbar.Add($"{gameServer.Config.Basic.Name}: Fail to Install - {e.Message}", Severity.Error);
+        }
+    }
+
+    private async void OpenImportDialog()
+    {
+        DialogOptions options = new()
+        {
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true,
+            CloseButton = true,
+            CloseOnEscapeKey = true,
+            DisableBackdropClick = true,
+        };
+
+        IDialogReference dialogReference = DialogService.Show<GameServerImportDialog>("Import Game Server", options);
+        DialogResult dialogResult = await dialogReference.Result;
+
+        if (dialogResult.Cancelled)
+        {
+            return;
+        }
+
+        Dictionary<string, object> data = (Dictionary<string, object>)dialogResult.Data;
+        IGameServer gameServer = (IGameServer)data["GameServer"];
+
+        await gameServer.Config.Update();
+
+        GameServerService.AddInstance(gameServer);
+        GameServerService.UpdateServerGuids();
+
+        Snackbar.Add($"{gameServer.Config.Basic.Name}: Imported", Severity.Success);
+    }
+
+    private void NavigateToControlPanel(Guid guid)
+    {
+        NavManager.NavigateTo($"/servers/{guid}");
+    }
+}

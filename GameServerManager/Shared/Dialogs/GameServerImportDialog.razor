@@ -1,0 +1,104 @@
+﻿@inject GameServerService GameServerService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form" Style="padding-right: 12px; max-height: 500px; overflow-y: scroll">
+            @if (GameServer == null)
+            {
+                <MudSelect Value="@_gameServer" Label="Select the game server" HelperText="@($"{_gameServers.Count} game servers supported")" Variant="Variant.Outlined" T="IGameServer" ValueChanged="GameServerValueChanged">
+                    @foreach (IGameServer gameServer in _gameServers)
+                    {
+                        <MudSelectItem Value="@gameServer">
+                            <div class="d-flex align-center">
+                                <img src="@gameServer.ImageSource" height="24" class="mr-2 rounded-lg" /> @gameServer.Name
+                            </div>
+                        </MudSelectItem>
+                    }
+                </MudSelect>
+            }
+
+            <MudTextField @bind-Value="@_basic.Name" Label="Name" HelperText="Server Display Name (You can change it later)" Required="true"></MudTextField>
+            <MudTextField @bind-Value="@_basic.Directory" Label="Directory" HelperText="Server Files Directory" Required="true"></MudTextField>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Warning" Variant="Variant.Filled" OnClick="Submit">Import</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    public MudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public IGameServer? GameServer { get; set; }
+
+    private List<IGameServer> _gameServers = new();
+    private IGameServer _gameServer = null!;
+    private Guid _guid = Guid.NewGuid();
+    private BasicConfig _basic = new();
+    private MudForm _form = null!;
+
+    protected override void OnInitialized()
+    {
+        _gameServers = GameServerService.GameServers;
+
+        if (GameServer != null)
+        {
+            _gameServer = GameServer;
+        }
+        else if (StorageService.TryGetItem<string>("ImportLastSelect", out string? name))
+        {
+            _gameServer = _gameServers.Find(x => x.Config.ClassName == name) ?? _gameServers[0];
+        }
+        else
+        {
+            _gameServer = _gameServers[0];
+        }
+
+        _guid = GameServer == null ? Guid.NewGuid() : GameServer.Config.Guid;
+        _basic = GameServer == null ? GameServerService.GetNewBasicConfig(_guid) : GameServer.Config.Basic;
+        _basic.Directory = string.Empty;
+    }
+
+    private void GameServerValueChanged(IGameServer gameServer)
+    {
+        _gameServer = gameServer;
+
+        StorageService.SetItem("ImportLastSelect", _gameServer.Config.ClassName);
+    }
+
+    private async Task Submit()
+    {
+        await _form.Validate();
+
+        if (_form.IsValid)
+        {
+            if (!Directory.Exists(_basic.Directory))
+            {
+                Snackbar.Add($"Import Server: Directory does not exist", Severity.Error);
+                return;
+            }
+
+            _gameServer.Config.Basic = _basic;
+            _gameServer.Config.Guid = _guid;
+            _gameServer.Config.LocalVersion = "Unknown";
+
+            Dictionary<string, object> data = new();
+            data.Add("GameServer", _gameServer);
+
+            MudDialog.Close(DialogResult.Ok(data));
+        }
+        else
+        {
+            foreach (string error in _form.Errors)
+            {
+                Snackbar.Add($"Import Server: {error}", Severity.Error);
+            }
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

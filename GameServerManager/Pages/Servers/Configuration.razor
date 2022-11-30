@@ -1,0 +1,97 @@
+﻿@page "/servers/{GuidString}/configuration"
+@inject NavigationManager NavigationManager
+@inject GameServerService GameServerService
+@inject ISnackbar Snackbar
+
+<MudContainer Class="mt-6" MaxWidth="MaxWidth.ExtraLarge">
+    <MudText Typo="Typo.h3"> <MudLink Href="@($"/servers/{GuidString}")" Typo="Typo.h3" Underline="Underline.None">Control Panel</MudLink> / Configuration</MudText>
+    <MudText Typo="Typo.subtitle1">Configure the parameters and settings for the server</MudText>
+
+    @if (_gameServer == null || _config == null)
+    {
+        <MudChip Variant="Variant.Text">Unknown game server guid</MudChip>
+    }
+    else
+    {
+        @*<MudTabs Elevation="2" Class="mb-4" ActivePanelIndex="@GameServerService.Instances.FindIndex(x => x.Config.Guid == _gameServer.Config.Guid)">
+            @foreach (IGameServer gameServer in GameServerService.Instances)
+            {
+                <MudTabPanel Text="@gameServer.Config.Basic.Name" OnClick="@(() => NavigateToConfiguration(gameServer.Config.Guid))" ID="@gameServer.Config.Guid" />
+            }
+        </MudTabs>*@
+
+        <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-6" Class="mt-6">
+            <MudForm @ref="_form">
+                @foreach (PropertyInfo tab in _config.GetType().GetProperties())
+                {
+                    @if (tab.TryGetCustomAttribute<TabPanelAttribute>(out TabPanelAttribute? tabPanel) && tabPanel.Text != "Backup")
+                    {
+                        <MudTabPanel Text="@tabPanel.Text">
+                            <MudText Typo="Typo.subtitle1" Class="mb-4">@tabPanel.Description</MudText>
+
+                            <MudFieldBuilder Tab="tab" Config="_config" />
+                        </MudTabPanel> 
+                    }
+                }
+                <MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Save" Color="Color.Primary" FullWidth="true" Class="mt-6" OnClick="Update">Save</MudButton>
+            </MudForm>
+        </MudTabs>
+    }
+</MudContainer>
+
+@code {
+    [Parameter]
+    public string GuidString { get; set; } = string.Empty;
+
+    private IGameServer? _gameServer;
+    private IConfig? _config;
+    private MudForm? _form = null!;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Guid.TryParse(GuidString, out Guid guid))
+        {
+            _gameServer = GameServerService.Instances.Where(x => x.Config.Guid == guid).FirstOrDefault();
+            _config = _gameServer == null ? null : await _gameServer.Config.Clone();
+        }
+    }
+
+    private async Task Update()
+    {
+        if (_gameServer != null && _config != null && _form != null)
+        {
+            await _form.Validate();
+
+            if (_form.IsValid)
+            {
+                try
+                {
+                    _gameServer.Config = _config;
+                    await _gameServer.Config.Update();
+                    Snackbar.Add("Server Configuration: Saved", Severity.Success);
+                }
+                catch (Exception e)
+                {
+                    Snackbar.Add($"Server Configuration: {e.Message}", Severity.Error);
+                }
+            }
+            else
+            {
+                foreach (string error in _form.Errors)
+                {
+                    Snackbar.Add($"Server Configuration: {error}", Severity.Error);
+                }
+            }
+        }
+    }
+
+    private async Task NavigateToConfiguration(Guid guid)
+    {
+        NavigationManager.NavigateTo($"/servers/{guid}/configuration");
+        
+        _gameServer = GameServerService.Instances.Where(x => x.Config.Guid == guid).FirstOrDefault();
+        _config = _gameServer == null ? null : await _gameServer.Config.Clone();
+
+        await InvokeAsync(StateHasChanged);
+    }
+}

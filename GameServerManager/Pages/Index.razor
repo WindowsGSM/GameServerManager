@@ -1,0 +1,13 @@
+﻿@page "/"
+@inject NavigationManager NavigationManager
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        // void OnInitialized() will crash idk why
+
+        NavigationManager.NavigateTo("/servers");
+
+        await Task.Delay(0);
+    }
+}
