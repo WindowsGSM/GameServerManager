@@ -1,10 +1,10 @@
-﻿@page "/servers/{GuidString}/configuration"
+﻿@page "/servers/{Guid:guid}/configuration"
 @inject NavigationManager NavigationManager
 @inject GameServerService GameServerService
 @inject ISnackbar Snackbar
 
 <MudContainer Class="mt-6" MaxWidth="MaxWidth.ExtraLarge">
-    <MudText Typo="Typo.h3"> <MudLink Href="@($"/servers/{GuidString}")" Typo="Typo.h3" Underline="Underline.None">Control Panel</MudLink> / Configuration</MudText>
+    <MudText Typo="Typo.h3">Configuration</MudText>
     <MudText Typo="Typo.subtitle1">Configure the parameters and settings for the server</MudText>
 
     @if (_gameServer == null || _config == null)
@@ -19,6 +19,8 @@
                 <MudTabPanel Text="@gameServer.Config.Basic.Name" OnClick="@(() => NavigateToConfiguration(gameServer.Config.Guid))" ID="@gameServer.Config.Guid" />
             }
         </MudTabs>*@
+
+        <ServerTable GameServer="_gameServer" />
 
         <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-6" Class="mt-6">
             <MudForm @ref="_form">
@@ -41,7 +43,7 @@
 
 @code {
     [Parameter]
-    public string GuidString { get; set; } = string.Empty;
+    public Guid Guid { get; set; }
 
     private IGameServer? _gameServer;
     private IConfig? _config;
@@ -49,11 +51,8 @@
 
     protected override async Task OnParametersSetAsync()
     {
-        if (Guid.TryParse(GuidString, out Guid guid))
-        {
-            _gameServer = GameServerService.Instances.Where(x => x.Config.Guid == guid).FirstOrDefault();
-            _config = _gameServer == null ? null : await _gameServer.Config.Clone();
-        }
+        _gameServer = GameServerService.Instances.Where(x => x.Config.Guid == Guid).FirstOrDefault();
+        _config = _gameServer == null ? null : await _gameServer.Config.Clone();
     }
 
     private async Task Update()

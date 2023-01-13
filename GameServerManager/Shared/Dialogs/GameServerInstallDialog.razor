@@ -95,7 +95,7 @@
         {
             _gameServer = GameServer;
         }
-        else if (StorageService.TryGetItem<string>("InstallLastSelect", out string? name))
+        else if (ProgramDataService.Cache.InstallLastSelect.TryRead(out string? name))
         {
             _gameServer = _gameServers.Find(x => x.Config.ClassName == name) ?? _gameServers[0];
         }
@@ -128,7 +128,7 @@
         _versions = GameServerService.GetVersions(_gameServer)?.Versions ?? new();
         _version = _versions.FirstOrDefault() ?? " ";
 
-        StorageService.SetItem("InstallLastSelect", _gameServer.Config.ClassName);
+        ProgramDataService.Cache.InstallLastSelect.Write(_gameServer.Config.ClassName);
 
         if (_select != null)
         {

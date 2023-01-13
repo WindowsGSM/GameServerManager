@@ -1,7 +1,6 @@
 ﻿using Microsoft.Extensions.Hosting.WindowsServices;
 using Serilog;
 using System.Collections.Concurrent;
-using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Text.Json;
 using GameServerManager.GameServers.Components;
@@ -17,11 +16,12 @@ namespace GameServerManager.Services
     {
         public static readonly bool IsWindowsService = WindowsServiceHelpers.IsWindowsService();
 
+        /// <summary>
+        /// WindowsGSM.exe Path - Always C:\Program Files\WindowsGSM
+        /// </summary>
         public static readonly string ProcessPath = Path.GetDirectoryName(Environment.ProcessPath)!;
-        public static readonly string DefaultBackupsPath = Path.Combine(ProcessPath, "backups");
-        public static readonly string ConfigsPath = Path.Combine(ProcessPath, "configs");
-        public static readonly string LogsPath = Path.Combine(ProcessPath, "logs");
-        public static readonly string DefaultServersPath = Path.Combine(ProcessPath, "servers");
+
+        public static readonly string DefaultBackupsPath = Path.Combine(ProgramDataService.ProgramDataPath, "backups");
 
         public static event Action? GameServersHasChanged;
         public static void InvokeGameServersHasChanged() => GameServersHasChanged?.Invoke();
@@ -41,6 +41,14 @@ namespace GameServerManager.Services
             public List<string> Versions { get; set; }
 
             public DateTime DateTime { get; set; }
+
+            public string LatestVersion
+            {
+                get
+                {
+                    return Versions.Count <= 0 ? string.Empty : Versions[0];
+                }
+            }
         }
 
         public class VersionData : IVersions
@@ -59,11 +67,6 @@ namespace GameServerManager.Services
         public GameServerService(ILogger<GameServerService> logger)
         {
             _logger = logger;
-
-            Directory.CreateDirectory(DefaultBackupsPath);
-            Directory.CreateDirectory(ConfigsPath);
-            Directory.CreateDirectory(LogsPath);
-            Directory.CreateDirectory(DefaultServersPath);
 
             InitializeInstances();
             AutoStartInstances();
@@ -86,22 +89,20 @@ namespace GameServerManager.Services
 
         private static void InitializeInstances()
         {
-            if (StorageService.TryGetItem("ServerGuids", out List<string>? guids))
+            if (ProgramDataService.Data.ServerGuids.TryRead(out List<string>? guids))
             {
                 foreach (string guid in guids)
                 {
-                    string configPath = Path.Combine(ConfigsPath, $"{guid}.json");
-
-                    if (TryDeserialize(configPath, out IGameServer? gameServer) && !Instances.Select(x => x.Config.Guid).Contains(gameServer.Config.Guid))
+                    if (ProgramDataService.Configs.TryGetGameServer(guid, out IGameServer? gameServer) && !Instances.Select(x => x.Config.Guid).Contains(gameServer.Config.Guid))
                     {
                         AddInstance(gameServer);
                     }
                 }
             }
 
-            foreach (string configPath in Directory.GetFiles(ConfigsPath, "*.json", SearchOption.TopDirectoryOnly))
+            foreach (string path in ProgramDataService.Configs.GetFiles())
             {
-                if (TryDeserialize(configPath, out IGameServer? gameServer) && !Instances.Select(x => x.Config.Guid).Contains(gameServer.Config.Guid))
+                if (ProgramDataService.Configs.TryGetGameServer(Path.GetFileName(path), out IGameServer? gameServer) && !Instances.Select(x => x.Config.Guid).Contains(gameServer.Config.Guid))
                 {
                     AddInstance(gameServer);
                 }
@@ -112,17 +113,15 @@ namespace GameServerManager.Services
 
         public static void UpdateServerGuids()
         {
-            StorageService.SetItem("ServerGuids", Instances.Select(x => x.Config.Guid.ToString()));
+            ProgramDataService.Data.ServerGuids.Write(Instances.Select(x => x.Config.Guid.ToString()).ToList());
         }
 
         public static void AddInstance(IGameServer gameServer)
         {
             Instances.Add(gameServer);
 
-            string logPath = Path.Combine(LogsPath, gameServer.Config.Guid.ToString());
-            Directory.CreateDirectory(logPath);
-
-            gameServer.Logger = new LoggerConfiguration().WriteTo.File(Path.Combine(logPath, "log.txt"), rollingInterval: RollingInterval.Day, rollOnFileSizeLimit: true).CreateLogger();
+            string path = ProgramDataService.Logs.GetPath(gameServer.Config.Guid);
+            gameServer.Logger = new LoggerConfiguration().WriteTo.File(Path.Combine(path, "log.txt"), rollingInterval: RollingInterval.Day, rollOnFileSizeLimit: true).CreateLogger();
             gameServer.Status = string.IsNullOrEmpty(gameServer.Config.LocalVersion) ? Status.NotInstalled : Status.Stopped; 
             gameServer.Process.Exited += async (exitCode) => await OnGameServerExited(gameServer);
 
@@ -172,7 +171,7 @@ namespace GameServerManager.Services
             return new()
             {
                 Name = $"WindowsGSM - Server #{number}",
-                Directory = Path.Combine(DefaultServersPath, guid.ToString()),
+                Directory = Path.Combine(ProgramDataService.Servers.ServersPath, guid.ToString()),
             };
         }
 
@@ -218,41 +217,6 @@ namespace GameServerManager.Services
         public IResponse? GetResponse(IGameServer gameServer)
         {
             return Responses.GetValueOrDefault(gameServer.Config.Guid);
-        }
-
-        /// <summary>
-        /// Try Deserialize
-        /// </summary>
-        /// <param name="json"></param>
-        /// <param name="server"></param>
-        /// <returns></returns>
-        private static bool TryDeserialize(string path, [NotNullWhen(true)] out IGameServer? server)
-        {
-            try
-            {
-                server = Deserialize(File.ReadAllText(path));
-                return true;
-            }
-            catch
-            {
-                server = null;
-                return false;
-            }
-        }
-
-        /// <summary>
-        /// Deserialize Config Json
-        /// </summary>
-        /// <param name="json"></param>
-        /// <returns></returns>
-        /// <exception cref="Exception"></exception>
-        private static IGameServer Deserialize(string json)
-        {
-            Dictionary<string, object> config = JsonSerializer.Deserialize<Dictionary<string, object>>(json)!;
-            IGameServer gameServer = (IGameServer)Activator.CreateInstance(Type.GetType($"{nameof(GameServerManager)}.GameServers.{config["ClassName"]}")!)!;
-            gameServer.Config = (IConfig)JsonSerializer.Deserialize(json, gameServer.Config.GetType())!;
-
-            return gameServer;
         }
 
         public Task StartAsync(CancellationToken cancellationToken)

@@ -1,5 +1,6 @@
 ﻿@inherits LayoutComponentBase
 @inject GameServerService GameServerService
+@inject NavigationManager NavigationManager
 
 <MudThemeProvider Theme="_theme" />
 <MudDialogProvider />
@@ -17,9 +18,9 @@
         <MudTooltip Text="Discord">
             <MudIconButton Icon="@Icons.Custom.Brands.Discord" Color="Color.Inherit" Link="https://discord.gg/8nxm6zAtc7" Target="_blank" />
         </MudTooltip>
-        <MudTooltip Text="Youtube">
+        @*<MudTooltip Text="Youtube">
             <MudIconButton Icon="@Icons.Custom.Brands.YouTube" Color="Color.Inherit" Link="https://www.youtube.com/channel/UCgZ-q9VaVOcv5Yi4tkNd7pA" Target="_blank" />
-        </MudTooltip>
+        </MudTooltip>*@
         <MudTooltip Text="Github Repository">
             <MudIconButton Icon="@Icons.Custom.Brands.GitHub" Color="Color.Inherit" Link="https://github.com/WindowsGSM/WindowsGSM/tree/main" Target="_blank" />
         </MudTooltip>
@@ -39,14 +40,34 @@
         </MudDrawerHeader>
         <MudNavMenu Class="mud-width-full" Bordered="true">
             @*<MudNavLink Href="/dashboard" Icon="@Icons.Filled.Dashboard">Dashboard</MudNavLink>*@
-            <MudNavLink Href="/servers" Match="NavLinkMatch.All" Icon="@Icons.Filled.Storage">Servers</MudNavLink>
+            
 
-            <MudNavGroup Title="Control Panel" Icon="@Icons.Filled.DisplaySettings" Expanded="true" Class="mt-3">
+            @if (NavigationManager.ToBaseRelativePath(NavigationManager.Uri).StartsWith("servers/"))
+            {
+                string guid = NavigationManager.ToBaseRelativePath(NavigationManager.Uri).Split('/')[1];
+
+                <MudNavLink Href="/servers" Match="NavLinkMatch.All" Icon="@Icons.Filled.ArrowBack">Servers</MudNavLink>
+
+                <MudText Typo="Typo.h6" Style="padding: 8px 16px 8px 16px;">Control Panel</MudText>
+
+                <MudNavLink Href=@($"/servers/{guid}/dashboard") Match="NavLinkMatch.All" Icon="@Icons.Filled.Dashboard">Dashboard</MudNavLink>
+                @*<MudNavLink Href=@($"/servers/{guid}/console") Match="NavLinkMatch.All" Icon="@Icons.Filled.Terminal">Console</MudNavLink>*@
+                <MudNavLink Href=@($"/servers/{guid}/version") Match="NavLinkMatch.All" Icon="@Icons.Filled.Update">Version</MudNavLink>
+                <MudNavLink Href=@($"/servers/{guid}/logs") Match="NavLinkMatch.All" Icon="@Icons.Filled.Event">Logs</MudNavLink>
+                <MudNavLink Href=@($"/servers/{guid}/configuration") Match="NavLinkMatch.All" Icon="@Icons.Filled.Settings">Configuration</MudNavLink>
+            }
+            else
+            {
+                <MudNavLink Href="/servers" Match="NavLinkMatch.All" Icon="@Icons.Filled.Storage">Servers</MudNavLink>
+            }
+            
+
+            @*<MudNavGroup Title="Control Panel" Icon="@Icons.Filled.DisplaySettings" Expanded="true" Class="mt-3">
                 @foreach (IGameServer gameServer in GameServerService.Instances)
                 {
                     <MudNavLink Href="@($"/servers/{gameServer.Config.Guid}")">@gameServer.Config.Basic.Name</MudNavLink>
                 }
-            </MudNavGroup>
+            </MudNavGroup>*@
         </MudNavMenu>
     </MudDrawer>
     <MudMainContent>
@@ -60,7 +81,7 @@
 
     private bool _drawerOpen = true;
 
-    private enum Theme
+    public enum Theme
     {
         Default, Dark
     }
@@ -72,7 +93,7 @@
 
     protected override void OnInitialized()
     {
-        if (StorageService.TryGetItem<Theme>(nameof(Theme), out Theme theme))
+        if (ProgramDataService.Cache.Theme.TryRead(out Theme theme))
         {
             _theme = theme == Theme.Default ? _defaultTheme : _darkTheme;
         }
@@ -87,7 +108,7 @@
     private void ChangeTheme()
     {
         _theme = _theme == _defaultTheme ? _darkTheme : _defaultTheme;
-        StorageService.SetItem(nameof(Theme), _theme == _defaultTheme ? Theme.Default : Theme.Dark);
+        ProgramDataService.Cache.Theme.Write(_theme == _defaultTheme ? Theme.Default : Theme.Dark);
     }
 
     private MudTheme _theme = new();

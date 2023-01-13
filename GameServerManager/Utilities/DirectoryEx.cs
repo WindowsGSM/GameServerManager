@@ -12,7 +12,7 @@ namespace GameServerManager.Utilities
         /// <returns></returns>
         public static Task DeleteAsync(string path, bool recursive = false)
         {
-            return TaskEx.Run(() => Directory.Delete(path, recursive));
+            return Task.Run(() => Directory.Delete(path, recursive));
         }
 
         /// <summary>
@@ -52,7 +52,7 @@ namespace GameServerManager.Utilities
         {
             if (!overwrite)
             {
-                await TaskEx.Run(() => Directory.Move(sourceDirName, destDirName));
+                await Task.Run(() => Directory.Move(sourceDirName, destDirName));
 
                 return;
             }

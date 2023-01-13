@@ -15,7 +15,7 @@ namespace GameServerManager.GameServers
             public new async Task<IResponse> Query(IProtocolConfig protocolConfig)
             {
                 Source source = new(protocolConfig.Protocol.IPAddress, protocolConfig.Protocol.QueryPort);
-                Source.SourceResponse response = (Source.SourceResponse)await TaskEx.Run(() => source.GetInfo());
+                Source.SourceResponse response = (Source.SourceResponse)await Task.Run(() => source.GetInfo());
 
                 int player = response.Keywords.Split(",").Where(x => x.Split(":")[0] == "B").Select(x => int.Parse(x.Split(":")[1])).FirstOrDefault();
 

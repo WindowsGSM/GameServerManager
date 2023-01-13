@@ -184,7 +184,7 @@ namespace GameServerManager.GameServers.Components
 
             try
             {  
-                await TaskEx.Run(() => Process.Kill());
+                await Task.Run(() => Process.Kill());
 
                 if (!await Process.WaitForExit(5000))
                 {
@@ -311,6 +311,16 @@ namespace GameServerManager.GameServers.Components
 
                 throw;
             }
+        }
+
+        public async Task CloneAsync()
+        {
+            
+        }
+
+        public async Task ForkAsync()
+        {
+
         }
 
         public async Task InstallModAsync(IMod mod, string version)

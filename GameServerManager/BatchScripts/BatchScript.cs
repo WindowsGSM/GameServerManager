@@ -29,7 +29,7 @@ namespace GameServerManager.BatchScripts
                 }
             };
 
-            await TaskEx.Run(() => batchProcess.Start());
+            await Task.Run(() => batchProcess.Start());
 
             return await batchProcess.StandardOutput.ReadToEndAsync();
         }

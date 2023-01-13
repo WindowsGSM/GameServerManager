@@ -3,16 +3,19 @@
 
 <MudContainer Class="mt-6 mb-6" MaxWidth="MaxWidth.ExtraLarge">
     <MudText Typo="Typo.h3">
-        <MudLink Href="@($"/servers/{Guid}")" Typo="Typo.h3" Underline="Underline.None">Control Panel</MudLink> / Logs
+        Logs
 
         @if (_gameServer == null)
         {
              <MudChip Variant="Variant.Text">Unknown</MudChip>
         }
     </MudText>
+
     <MudText Typo="Typo.subtitle1">
         Checking your server's log files
     </MudText>
+
+    <ServerTable GameServer="_gameServer" />
 
     <MudSelect T="string" @bind-Value="selectedFile" Label="Log File" AnchorOrigin="Origin.BottomCenter" Variant="Variant.Outlined" Class="mt-4 mb-4">
         @foreach (string fileName in files)
@@ -46,9 +49,7 @@
 
         if (_gameServer != null)
         {
-            string path = Path.Combine(GameServerService.LogsPath, _gameServer.Config.Guid.ToString());
-            DirectoryInfo info = new(path);
-            files = await TaskEx.Run(() => info.GetFiles("*.txt", SearchOption.TopDirectoryOnly).OrderByDescending(p => p.CreationTime).Select(x => x.Name).ToList());
+            files = await ProgramDataService.Logs.GetFiles(_gameServer.Config.Guid);
             selectedFile = files.FirstOrDefault();
         }
     }
@@ -57,9 +58,9 @@
     {
         if (selectedFile != null && _gameServer != null)
         {
-            string path = Path.Combine(GameServerService.LogsPath, _gameServer.Config.Guid.ToString());
-            text = await FileEx.ReadAllText(Path.Combine(path, selectedFile));
-            InvokeAsync(StateHasChanged);
+            string path = ProgramDataService.Logs.GetFile(_gameServer.Config.Guid, selectedFile);
+            text = await FileEx.ReadAllText(path);
+            await InvokeAsync(StateHasChanged);
         }
     }
 }

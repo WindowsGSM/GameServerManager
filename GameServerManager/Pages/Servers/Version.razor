@@ -1,0 +1,266 @@
+﻿@page "/servers/{Guid:guid}/version"
+@inject NavigationManager NavigationManager
+@inject GameServerService GameServerService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<MudContainer Class="mt-6 mb-6" MaxWidth="MaxWidth.ExtraLarge">
+    <MudText Typo="Typo.h3">
+        Version
+
+        @if (_gameServer == null)
+        {
+            <MudChip Variant="Variant.Text">Unknown</MudChip>
+        }
+    </MudText>
+    <MudText Typo="Typo.subtitle1">Manage your game server version</MudText>
+
+    @if (_gameServer != null)
+    {
+        <ServerTable GameServer="_gameServer" />
+
+        <MudPaper Elevation="2" Class="pa-4 my-4">
+            @{
+                <MudText Typo="Typo.h5">@_gameServer.Name <MudChip Variant="Variant.Outlined" Size="Size.Small">SERVER</MudChip></MudText>
+
+                <div class="mt-2 mb-3">
+                    @if (string.IsNullOrEmpty(_gameServer.Config.LocalVersion))
+                    {
+                        <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Success" StartIcon="@Icons.Filled.FileDownload" OnClick="@((e) => Install(_gameServer))" Disabled="@_gameServer.Status.IsDisabled(Operation.Install)">Install</MudButton>
+                    }
+                    else
+                    {
+                        <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Warning" StartIcon="@Icons.Filled.KeyboardDoubleArrowUp" OnClick="@((e) => Update(_gameServer))" Disabled="@_gameServer.Status.IsDisabled(Operation.Update)">Update</MudButton>
+                    }
+                </div>
+
+                <MudTextField T="string" Label="Local Version" ReadOnly="true" Value="@_gameServer.Config.LocalVersion" Placeholder="Not Installed" />
+
+                GameServerService.IVersions? versionData = GameServerService.GetVersions(_gameServer);
+
+                <MudTextField T="string"
+                    Label="Latest Stable Version"
+                    ReadOnly="true"
+                    Value="@versionData?.LatestVersion"
+                    HelperText="@($"Last fetch: {(versionData?.DateTime.ToString() ?? "-")}")" />
+            }
+
+            @foreach (IMod mod in GameServerService.Mods)
+            {
+                @if (_gameServer.Config.GetType().GetInterfaces().Contains(mod.ConfigType))
+                {
+                    <MudText Typo="Typo.h5" Class="mt-6">@mod.Name <MudChip Variant="Variant.Outlined" Size="Size.Small">MOD</MudChip></MudText>
+                    <MudText Typo="Typo.body2">@mod.Description</MudText>
+
+                    <div class="mt-2 mb-3">
+                        @if (string.IsNullOrEmpty(mod.GetLocalVersion(_gameServer)))
+                        {
+                            <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Success" StartIcon="@Icons.Filled.FileDownload" OnClick="@((e) => InstallMod(_gameServer, mod))" Disabled="@_gameServer.Status.IsDisabled(Operation.InstallMod)">Install</MudButton>
+                        }
+                        else
+                        {
+                            <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Warning" StartIcon="@Icons.Filled.KeyboardDoubleArrowUp" OnClick="@((e) => UpdateMod(_gameServer, mod))" Disabled="@_gameServer.Status.IsDisabled(Operation.UpdateMod)">Update</MudButton>
+                            <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Filled.Delete" OnClick="@((e) => DeleteMod(_gameServer, mod))" Disabled="@_gameServer.Status.IsDisabled(Operation.DeleteMod)">Delete</MudButton>
+                        }
+                    </div>
+
+                    <MudTextField T="string" Label="Local Version" ReadOnly="true" Value="@(mod.GetLocalVersion(_gameServer))" Placeholder="Not Installed" />
+
+                    GameServerService.IVersions? versionData2 = GameServerService.GetVersions(mod);
+
+                    <MudTextField T="string"
+                          Label="Latest Stable Version"
+                          ReadOnly="true"
+                          Value="@((versionData2 == null || versionData2.Versions.Count <= 0) ? string.Empty : versionData2.Versions[0])"
+                          HelperText="@($"Last fetch: {(versionData2?.DateTime.ToString() ?? "-")}")" />
+                }
+            }
+        </MudPaper>
+    }
+</MudContainer>
+
+@code {
+    [Parameter]
+    public Guid Guid { get; set; }
+
+    private IGameServer? _gameServer;
+
+    protected override void OnInitialized()
+    {
+        GameServerService.GameServersHasChanged += () => InvokeAsync(StateHasChanged);
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _gameServer = GameServerService.Instances.Where(x => x.Config.Guid == Guid).FirstOrDefault();
+    }
+
+    private async void Install(IGameServer gameServer)
+    {
+        DialogParameters parameters = new();
+        parameters.Add("GameServer", gameServer);
+
+        DialogOptions options = new()
+        {
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true,
+            CloseButton = true,
+            CloseOnEscapeKey = true,
+            DisableBackdropClick = true,
+        };
+
+        IDialogReference dialogReference = DialogService.Show<GameServerInstallDialog>($"Install {gameServer.Name}", parameters, options);
+        DialogResult dialogResult = await dialogReference.Result;
+
+        if (dialogResult.Cancelled)
+        {
+            return;
+        }
+
+        Dictionary<string, object> data = (Dictionary<string, object>)dialogResult.Data;
+        string version = data["Version"].ToString()!;
+
+        try
+        {
+            await gameServer.InstallAsync(version);
+            Snackbar.Add($"{gameServer.Config.Basic.Name}: Installed", Severity.Success);
+        }
+        catch (Exception e)
+        {
+            Snackbar.Add($"{gameServer.Config.Basic.Name}: Fail to Install - {e.Message}", Severity.Error);
+        }
+    }
+
+    private async Task Update(IGameServer gameServer)
+    {
+        DialogParameters parameters = new();
+        parameters.Add("GameServer", gameServer);
+
+        DialogOptions options = new()
+        {
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true,
+            CloseButton = true,
+            CloseOnEscapeKey = true,
+        };
+
+        IDialogReference dialogReference = DialogService.Show<GameServerUpdateDialog>($"Update {gameServer.Name}", parameters, options);
+        DialogResult dialogResult = await dialogReference.Result;
+
+        if (dialogResult.Cancelled)
+        {
+            return;
+        }
+
+        try
+        {
+            string version = dialogResult.Data.ToString()!;
+            await gameServer.UpdateAsync(version);
+            Snackbar.Add($"{gameServer.Config.Basic.Name}: Updated", Severity.Success);
+        }
+
+        catch (Exception e)
+        {
+            Snackbar.Add($"{gameServer.Config.Basic.Name}: Fail to Update - {e.Message}", Severity.Error);
+        }
+    }
+
+    private async Task InstallMod(IGameServer gameServer, IMod mod)
+    {
+        DialogParameters parameters = new();
+        parameters.Add("Mod", mod);
+
+        DialogOptions options = new()
+            {
+                MaxWidth = MaxWidth.Small,
+                FullWidth = true,
+                CloseButton = true,
+                CloseOnEscapeKey = true,
+            };
+
+        IDialogReference dialogReference = DialogService.Show<ModDialog>($"Install {mod.Name}", parameters, options);
+        DialogResult dialogResult = await dialogReference.Result;
+
+        if (dialogResult.Cancelled)
+        {
+            return;
+        }
+
+        try
+        {
+            string version = dialogResult.Data.ToString()!;
+            await gameServer.InstallModAsync(mod, version);
+            Snackbar.Add($"{gameServer.Config.Basic.Name}: {mod.Name} Installed", Severity.Success);
+        }
+        catch (Exception e)
+        {
+            Snackbar.Add($"{gameServer.Config.Basic.Name}: Fail to Install {mod.Name} - {e.Message}", Severity.Error);
+        }
+    }
+
+    private async Task UpdateMod(IGameServer gameServer, IMod mod)
+    {
+        DialogParameters parameters = new();
+        parameters.Add("Mod", mod);
+
+        DialogOptions options = new()
+        {
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true,
+            CloseButton = true,
+            CloseOnEscapeKey = true,
+        };
+
+        IDialogReference dialogReference = DialogService.Show<ModDialog>($"Update {mod.Name}", parameters, options);
+        DialogResult dialogResult = await dialogReference.Result;
+
+        if (dialogResult.Cancelled)
+        {
+            return;
+        }
+
+        try
+        {
+            string version = dialogResult.Data.ToString()!;
+            await gameServer.UpdateModAsync(mod, version);
+            Snackbar.Add($"{gameServer.Config.Basic.Name}: {mod.Name} Updated", Severity.Success);
+        }
+        catch (Exception e)
+        {
+            Snackbar.Add($"{gameServer.Config.Basic.Name}: Fail to Update {mod.Name} - {e.Message}", Severity.Error);
+        }
+    }
+
+    private async Task DeleteMod(IGameServer gameServer, IMod mod)
+    {
+        DialogParameters parameters = new();
+        parameters.Add("Mod", mod);
+
+        DialogOptions options = new()
+        {
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true,
+            CloseButton = true,
+            CloseOnEscapeKey = true,
+        };
+
+        IDialogReference dialogReference = DialogService.Show<ModDialog>($"Delete {mod.Name}", parameters, options);
+        DialogResult dialogResult = await dialogReference.Result;
+
+        if (dialogResult.Cancelled)
+        {
+            return;
+        }
+
+        try
+        {
+            string version = dialogResult.Data.ToString()!;
+            await gameServer.DeleteModAsync(mod);
+            Snackbar.Add($"{gameServer.Config.Basic.Name}: {mod.Name} Deleted", Severity.Success);
+        }
+        catch (Exception e)
+        {
+            Snackbar.Add($"{gameServer.Config.Basic.Name}: Fail to Delete {mod.Name} - {e.Message}", Severity.Error);
+        }
+    }
+}

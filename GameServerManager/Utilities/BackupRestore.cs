@@ -18,7 +18,7 @@ namespace GameServerManager.Utilities
         {
             string backupFile = Path.Combine(GetBackupPath(gameServer), $"{DateTime.Now:yyyyMMddTHHmmss}.zip");
 
-            return TaskEx.Run(() => ZipFile.CreateFromDirectory(sourceDirectoryName, backupFile));
+            return Task.Run(() => ZipFile.CreateFromDirectory(sourceDirectoryName, backupFile));
         }
 
         public static async Task CreateBackupZip(IGameServer gameServer, List<string> entries) // Should check all entries are valid before run, entries in full path
@@ -31,11 +31,11 @@ namespace GameServerManager.Utilities
             {
                 if (File.GetAttributes(entry).HasFlag(FileAttributes.Directory))
                 {
-                    await TaskEx.Run(() => archive.CreateEntry(entry));
+                    await Task.Run(() => archive.CreateEntry(entry));
                 }
                 else
                 {
-                    await TaskEx.Run(() => archive.CreateEntryFromFile(entry, Path.GetFileName(entry)));
+                    await Task.Run(() => archive.CreateEntryFromFile(entry, Path.GetFileName(entry)));
                 }
             }
         }

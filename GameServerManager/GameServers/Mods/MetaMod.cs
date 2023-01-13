@@ -1,10 +1,17 @@
-﻿using System.Text.RegularExpressions;
+﻿using System.Reflection.Emit;
+using System.Text.RegularExpressions;
+using GameServerManager.Attributes;
 using GameServerManager.GameServers.Components;
 using GameServerManager.GameServers.Configs;
 using GameServerManager.Utilities;
 
 namespace GameServerManager.GameServers.Mods
 {
+    public interface IMetaModConfig
+    {
+        public MetaMod.Config MetaMod { get; set; }
+    }
+
     public class MetaMod : IMod
     {
         public string Name => nameof(MetaMod);
@@ -13,7 +20,12 @@ namespace GameServerManager.GameServers.Mods
 
         public Type ConfigType => typeof(IMetaModConfig);
 
-        public string GetLocalVersion(IGameServer gameServer) => ((IMetaModConfig)gameServer.Config).MetaModLocalVersion;
+        public class Config
+        {
+            public string LocalVersion { get; set; } = string.Empty;
+        }
+
+        public string GetLocalVersion(IGameServer gameServer) => ((IMetaModConfig)gameServer.Config).MetaMod.LocalVersion;
 
         public async Task<List<string>> GetVersions()
         {
@@ -66,7 +78,7 @@ namespace GameServerManager.GameServers.Mods
             // Delete temporary directory
             await DirectoryEx.DeleteAsync(temporaryDirectory, true);
 
-            ((IMetaModConfig)gameServer.Config).MetaModLocalVersion = version;
+            ((IMetaModConfig)gameServer.Config).MetaMod.LocalVersion = version;
             await gameServer.Config.Update();
         }
 
@@ -83,7 +95,7 @@ namespace GameServerManager.GameServers.Mods
             await FileEx.DeleteIfExistsAsync(Path.Combine(addonPath, "metamod.vdf"));
             await FileEx.DeleteIfExistsAsync(Path.Combine(addonPath, "metamod_x64.vdf"));
 
-            ((IMetaModConfig)gameServer.Config).MetaModLocalVersion = string.Empty;
+            ((IMetaModConfig)gameServer.Config).MetaMod.LocalVersion = string.Empty;
             await gameServer.Config.Update();
         }
     }

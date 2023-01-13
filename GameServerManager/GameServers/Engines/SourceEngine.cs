@@ -2,6 +2,7 @@
 using GameServerManager.Attributes;
 using GameServerManager.GameServers.Components;
 using GameServerManager.GameServers.Configs;
+using GameServerManager.GameServers.Mods;
 using GameServerManager.GameServers.Protocols;
 using GameServerManager.Utilities;
 using ILogger = Serilog.ILogger;
@@ -19,7 +20,8 @@ namespace GameServerManager.GameServers.Engines
             public string StartParameter { get; set; } = string.Empty;
 
             [RadioGroup(Text = "Console Mode")]
-            [Radio(Option = "Redirect")]
+            // [Radio(Option = "Redirect")]
+            // [Radio(Option = "SrcdsRedirect")]
             [Radio(Option = "Windowed")]
             public string ConsoleMode { get; set; } = "Windowed";
         }
@@ -53,9 +55,9 @@ namespace GameServerManager.GameServers.Engines
                 QueryPort = 27015
             };
 
-            public string MetaModLocalVersion { get; set; } = string.Empty;
+            public MetaMod.Config MetaMod { get; set; } = new();
 
-            public string SourceModLocalVersion { get; set; } = string.Empty;
+            public SourceMod.Config SourceMod { get; set; } = new();
         }
 
         public virtual string Name => string.Empty;
@@ -74,7 +76,7 @@ namespace GameServerManager.GameServers.Engines
 
         public Task<bool> Detect(string path)
         {
-            return TaskEx.Run(() =>
+            return Task.Run(() =>
             {
                 return Directory.Exists(Path.Combine(path, ((ISteamCMDConfig)Config).SteamCMD.Game)) &&
                 File.Exists(Path.Combine(path, "srcds.exe")) &&
@@ -104,6 +106,14 @@ namespace GameServerManager.GameServers.Engines
                     StandardErrorEncoding = Encoding.UTF8,
                     RedirectStandardOutput = true,
                     RedirectStandardError = true
+                });
+            }
+            else if (config.Start.ConsoleMode == "SrcdsRedirect")
+            {
+                Process.UseSrcdsRedirect(new()
+                {
+                    FileName = Path.Combine(config.Basic.Directory, config.Start.StartPath),
+                    Arguments = config.Start.StartParameter,
                 });
             }
             else

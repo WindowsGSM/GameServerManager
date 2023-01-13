@@ -1,4 +1,4 @@
-﻿@page "/servers/{Guid:guid}"
+﻿@page "/servers/{Guid:guid}/dashboard"
 @inject NavigationManager NavigationManager
 @inject GameServerService GameServerService
 @inject IDialogService DialogService
@@ -7,7 +7,7 @@
 
 <MudContainer Class="mt-6 mb-6" MaxWidth="MaxWidth.ExtraLarge">
     <MudText Typo="Typo.h3">
-        Control Panel
+        Dashboard
 
         @if (_gameServer == null)
         {
@@ -18,44 +18,7 @@
 
     @if (_gameServer != null)
     {
-        List<IGameServer> gameServers = new() { _gameServer };
-
-        <MudTable Items="@gameServers" Dense="true" MultiSelection="false" Class="mt-4 mb-4">
-            <HeaderContent>
-                <MudTh>Game</MudTh>
-                <MudTh>PID</MudTh>
-                <MudTh>Status</MudTh>
-                <MudTh>Name</MudTh>
-                <MudTh>Map</MudTh>
-                <MudTh>Players</MudTh>
-                <MudTh>Uptime</MudTh>
-            </HeaderContent>
-            <RowTemplate>
-                <MudTd DataLabel="Game">
-                    <MudTooltip Text="@context.Name" Placement="Placement.Right">
-                        <MudImage Src="@context.ImageSource" Alt="@context.Config.ClassName" Elevation="2" Class="rounded-lg" Width="24" />
-                    </MudTooltip>
-                </MudTd>
-                <MudTd DataLabel="PID">@context.Process.Id</MudTd>
-                <MudTd DataLabel="Status">
-                    <MudChip Variant="Variant.Outlined" Size="Size.Small" Color="@context.Status.ToColor()">@context.Status.ToStringEx()</MudChip>
-                </MudTd>
-                <MudTd DataLabel="Name">@context.Config.Basic.Name</MudTd>
-                <MudTd DataLabel="Map">@GameServerService.GetResponse(context)?.MapName</MudTd>
-                <MudTd DataLabel="Players">
-                    @if (context.Config is IProtocolConfig protocolConfig)
-                    {
-                        var response = GameServerService.GetResponse(context);
-
-                        if (response != null)
-                        {
-                            <span>@response.Player / @response.MaxPlayer</span>
-                        }
-                    }
-                </MudTd>
-                <MudTd DataLabel="Uptime">@UptimeString(context.Process.StartTime)</MudTd>
-             </RowTemplate>
-        </MudTable>
+        <ServerTable GameServer="_gameServer" />
 
         <MudPaper Elevation="2" Class="mb-4">
             <MudToolBar>
@@ -76,7 +39,7 @@
                         Icon="@Icons.Material.Filled.Terminal"
                         Color="Color.Inherit"
                         OnClick="@((e) => _gameServer.Process.ToggleWindow())"
-                        Disabled="@(_gameServer.Status != Status.Started || _gameServer.Process.Mode != ProcessEx.ConsoleType.Windowed)" />
+                        Disabled="@(_gameServer.Status != Status.Started || !(_gameServer.Process.Mode == ProcessEx.ConsoleMode.Windowed || _gameServer.Process.Mode == ProcessEx.ConsoleMode.SrcdsRedirect))" />
                 </MudTooltip>
 
                 <MudDivider Vertical="true" FlexItem="true" Class="ma-4" />
@@ -110,8 +73,16 @@
 
                 <MudSpacer />
 
+                <MudTooltip Text="Clone">
+                    <MudIconButton Icon="@Icons.Filled.ContentCopy" Color="Color.Inherit" OnClick="@((e) => {})" />
+                </MudTooltip>
+
+                <MudTooltip Text="Fork">
+                    <MudIconButton Icon="@Icons.Filled.ForkRight" Color="Color.Inherit" OnClick="@((e) => {})" />
+                </MudTooltip>
+
                 <MudTooltip Text="@(Operation.Delete.ToString())">
-                    <MudIconButton Icon="@Icons.Filled.DeleteForever" Color="Color.Error" OnClick="@((e) => Delete(_gameServer))" Disabled="@(_gameServer.Status.IsDisabled(Operation.Delete))" />
+                    <MudIconButton Icon="@Icons.Filled.DeleteForever" Color="Color.Inherit" OnClick="@((e) => Delete(_gameServer))" Disabled="@(_gameServer.Status.IsDisabled(Operation.Delete))" />
                 </MudTooltip>
             </MudToolBar>
         </MudPaper>
@@ -137,7 +108,7 @@
                     <Xterm @ref="_terminal" Options="_options" AddonIds="_addonIds" OnFirstRender="@OnXtermRender" OnKey="@OnKey" />
                 </div>
 
-                @if (_gameServer.Process.Mode == ProcessEx.ConsoleType.Redirect)
+                @if (_gameServer.Process.Mode == ProcessEx.ConsoleMode.Redirect || _gameServer.Process.Mode == ProcessEx.ConsoleMode.SrcdsRedirect)
                 {
                     <div class="pa-1" style="background-color:black;border-bottom-left-radius:var(--mud-default-borderradius);border-bottom-right-radius:var(--mud-default-borderradius);">
                         <MudTextField
@@ -158,79 +129,6 @@
                     </div>
                 }
             </MudTabPanel>
-            <MudTabPanel Text="Version" Icon="@Icons.Filled.Update">
-                <div class="ma-6">
-                    @{
-                        <MudText Typo="Typo.h5" Class="mt-6">@_gameServer.Name <MudChip Variant="Variant.Outlined" Size="Size.Small">SERVER</MudChip></MudText>
-
-                        <div class="mt-2 mb-3">
-                            @if (string.IsNullOrEmpty(_gameServer.Config.LocalVersion))
-                            {
-                                <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Success" StartIcon="@Icons.Filled.FileDownload" OnClick="@((e) => Install(_gameServer))" Disabled="@_gameServer.Status.IsDisabled(Operation.Install)">Install</MudButton>
-                            }
-                            else
-                            {
-                                <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Warning" StartIcon="@Icons.Filled.KeyboardDoubleArrowUp" OnClick="@((e) => Update(_gameServer))" Disabled="@_gameServer.Status.IsDisabled(Operation.Update)">Update</MudButton>
-                            }
-                        </div>
-
-                        <MudTextField T="string" Label="Local Version" ReadOnly="true" Value="@_gameServer.Config.LocalVersion" Placeholder="Not Installed" />
-
-                        GameServerService.IVersions? versionData = GameServerService.GetVersions(_gameServer);
-
-                        <MudTextField
-                            T="string"
-                            Label="Latest Stable Version"
-                            ReadOnly="true"
-                            Value="@((versionData == null || versionData.Versions.Count <= 0) ? string.Empty : versionData.Versions[0])"
-                            HelperText="@($"Last fetch: {(versionData?.DateTime.ToString() ?? "-")}")" />
-                    }
-
-                    @foreach (IMod mod in GameServerService.Mods)
-                    {
-                        @if (_gameServer.Config.GetType().GetInterfaces().Contains(mod.ConfigType))
-                        {
-                            <MudText Typo="Typo.h5" Class="mt-6">@mod.Name <MudChip Variant="Variant.Outlined" Size="Size.Small">MOD</MudChip></MudText>
-                            <MudText Typo="Typo.body2">@mod.Description</MudText>
-
-                            <div class="mt-2 mb-3">
-                                @if (string.IsNullOrEmpty(mod.GetLocalVersion(_gameServer)))
-                                {
-                                    <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Success" StartIcon="@Icons.Filled.FileDownload" OnClick="@((e) => InstallMod(_gameServer, mod))" Disabled="@_gameServer.Status.IsDisabled(Operation.InstallMod)">Install</MudButton>
-                                }
-                                else
-                                {
-                                    <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Warning" StartIcon="@Icons.Filled.KeyboardDoubleArrowUp" OnClick="@((e) => UpdateMod(_gameServer, mod))" Disabled="@_gameServer.Status.IsDisabled(Operation.UpdateMod)">Update</MudButton>
-                                    <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Filled.Delete" OnClick="@((e) => DeleteMod(_gameServer, mod))" Disabled="@_gameServer.Status.IsDisabled(Operation.DeleteMod)">Delete</MudButton>     
-                                }
-                            </div>
-
-                            <MudTextField T="string" Label="Local Version" ReadOnly="true" Value="@(mod.GetLocalVersion(_gameServer))" Placeholder="Not Installed" />
-
-                            GameServerService.IVersions? versionData2 = GameServerService.GetVersions(mod);
-
-                            <MudTextField
-                                T="string"
-                                Label="Latest Stable Version"
-                                ReadOnly="true"
-                                Value="@((versionData2 == null || versionData2.Versions.Count <= 0) ? string.Empty : versionData2.Versions[0])"
-                                HelperText="@($"Last fetch: {(versionData2?.DateTime.ToString() ?? "-")}")" />
-                        }
-                    }
-                </div>
-            </MudTabPanel>
-            @*<MudTabPanel Text="Logs" Icon="@Icons.Filled.Event">
-                <div class="ma-6">
-                    <MudSelect T="string" @bind-Value="selectedLogFileName" Label="Log File" AnchorOrigin="Origin.BottomCenter" Variant="Variant.Outlined" Class="mb-4">
-                        @foreach (string fileName in logFileNames)
-                        {
-                            <MudSelectItem T="string" Value="@fileName">@fileName</MudSelectItem>
-                        }
-                    </MudSelect>
-
-                    <MudTextField @bind-Value="logFileText" Variant="Variant.Outlined" Lines="15"></MudTextField>
-                </div>
-            </MudTabPanel>*@
         </MudTabs>
     }
 </MudContainer>
@@ -257,31 +155,21 @@
     private MudTextField<string>? _commandTextField;
     private Timer? timer;
 
-    private List<string> logFileNames = new();
-    private string selectedLogFileName = string.Empty;
-    private string logFileText = string.Empty;
-    private Stream? stream;
-    private StreamReader? reader;
-
     protected override void OnInitialized()
     {
         GameServerService.GameServersHasChanged += () => InvokeAsync(StateHasChanged);
         timer = new Timer((state) => InvokeAsync(StateHasChanged), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
-
-        //await Subscribe();
     }
 
     public void Dispose()
     {
         timer?.Dispose();
-        stream?.Dispose();
-        reader?.Dispose();
     }
 
     protected override async Task OnParametersSetAsync()
     {
         Unsubscribe();
-        await Subscribe();
+        Subscribe();
 
         try
         {
@@ -297,7 +185,7 @@
         }
     }
 
-    private async Task Subscribe()
+    private void Subscribe()
     {
         _gameServer = GameServerService.Instances.Where(x => x.Config.Guid == Guid).FirstOrDefault();
 
@@ -305,45 +193,6 @@
         {
             _gameServer.Process.OutputDataReceived += OutputDataReceived;
             _gameServer.Process.Cleared += Cleared;
-
-            string logFilesPath = Path.Combine(GameServerService.LogsPath, _gameServer.Config.Guid.ToString());
-            DirectoryInfo info = new DirectoryInfo(logFilesPath);
-            logFileNames = await Task.Run(() => info.GetFiles("*.txt", SearchOption.TopDirectoryOnly).OrderByDescending(p => p.CreationTime).Select(x => x.Name).ToList());
-            selectedLogFileName = logFileNames.FirstOrDefault() ?? string.Empty;
-
-            /*
-            string logFilePath = Path.Combine(logFilesPath, selectedLogFileName);
-
-            stream?.Dispose();
-            reader?.Dispose();
-
-            if (File.Exists(logFilePath))
-            {
-                stream = File.Open(logFilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-                reader = new(stream);
-
-                try
-                {
-                    while (true)
-                    {
-                        string? line = await reader.ReadLineAsync();
-
-                        if (line != null)
-                        {
-                            logFileText += line + '\n';
-                            //await Task.Delay(1000);
-                        }
-                    }
-                }
-                catch
-                {
-                    
-                }
-            }
-            else
-            {
-                logFileText = string.Empty;
-            }*/
         }
     }
 
@@ -353,10 +202,6 @@
         {
             _gameServer.Process.OutputDataReceived -= OutputDataReceived;
             _gameServer.Process.Cleared -= Cleared;
-
-            logFileNames = new();
-            selectedLogFileName = string.Empty;
-            logFileText = string.Empty;
         }
     }
 
@@ -368,18 +213,6 @@
             await _terminal.Reset();
             await _terminal.Write(_gameServer?.Process.Output ?? string.Empty);
         }
-    }
-
-    private string UptimeString(DateTime? startTime)
-    {
-        if (startTime == null)
-        {
-            return "0:00:00:00";
-        }
-
-        TimeSpan t = TimeSpan.FromSeconds((DateTime.Now - startTime.Value).TotalSeconds);
-
-        return string.Format("{0}:{1:D2}:{2:D2}:{3:D2}", (int)t.TotalDays, t.Hours, t.Minutes, t.Seconds);
     }
 
     private async Task Search(MouseEventArgs args)
@@ -400,29 +233,41 @@
         _terminal?.Clear();
     }
 
+    // Xterm OnKey
     private async Task OnKey(KeyboardEventArgs args)
     {
-        if (_gameServer != null && _gameServer.Process.Mode == ProcessEx.ConsoleType.PseudoConsole)
+        if (_gameServer != null && _gameServer.Process.Mode == ProcessEx.ConsoleMode.PseudoConsole)
         {
             try
             {
-                await _gameServer.Process.Write(args.Key);
+                if (args.Code == "Enter" || args.Code == "NumpadEnter")
+                {
+                    await _gameServer.Process.WriteLine(string.Empty);
+                }
+                else if (args.Key.Length == 1)
+                {
+                    await _gameServer.Process.Write(args.Key);
+                }
             }
             catch (Exception e)
             {
-                // Cannot write
-                _terminal?.WriteLine($"Cannot write {e}");
+                // Cannot write (Ignore)
+                // _terminal?.WriteLine($"OnKey Cannot write {e}");
             }
         }
     }
 
+    // On _commandTextField click
     private async Task OnKeyDown(KeyboardEventArgs args)
     {
-        if (_commandTextField != null && (args.Code == "Enter" || args.Code == "NumpadEnter"))
+        if (args.Code == "Enter" || args.Code == "NumpadEnter")
         {
-            await SendCommand();
-            await Task.Delay(9);
-            await _commandTextField.Clear();
+            if (_commandTextField != null)
+            {
+                await SendCommand();
+                await Task.Delay(9);
+                await _commandTextField.Clear();
+            }
         }
     }
 
@@ -434,9 +279,10 @@
             {
                 await _gameServer.Process.WriteLine(_commandTextField.Value ?? string.Empty);
             }
-            catch
+            catch (Exception e)
             {
-                // Cannot write
+                // Cannot write (Ignore)
+                _terminal?.WriteLine($"SendCommand Cannot write {e}");
             }
 
             await _commandTextField.Clear();
@@ -596,7 +442,7 @@
 
             if (NavigationManager.ToBaseRelativePath(NavigationManager.Uri).StartsWith($"servers/{guid}"))
             {
-                NavigationManager.NavigateTo($"/servers");
+                NavigationManager.NavigateTo("/servers");
             }
         }
         catch (Exception e)
@@ -707,6 +553,7 @@
     {
         DialogParameters parameters = new();
         parameters.Add("Mod", mod);
+        parameters.Add("Action", mod);
 
         DialogOptions options = new()
         {

@@ -17,7 +17,7 @@ namespace GameServerManager.Utilities
         /// <returns></returns>
         public static Task DeleteAsync(string path)
         {
-            return TaskEx.Run(() => File.Delete(path));
+            return Task.Run(() => File.Delete(path));
         }
 
         /// <summary>
@@ -29,7 +29,7 @@ namespace GameServerManager.Utilities
         {
             if (File.Exists(path))
             {
-                return TaskEx.Run(() => File.Delete(path));
+                return DeleteAsync(path);
             }
 
             return Task.CompletedTask;
@@ -55,7 +55,7 @@ namespace GameServerManager.Utilities
         /// <returns></returns>
         public static Task ExtractZip(string sourceArchiveFileName, string destinationDirectoryName, bool overwriteFiles)
         {
-            return TaskEx.Run(() => ZipFile.ExtractToDirectory(sourceArchiveFileName, destinationDirectoryName, overwriteFiles));
+            return Task.Run(() => ZipFile.ExtractToDirectory(sourceArchiveFileName, destinationDirectoryName, overwriteFiles));
         }
 
         /// <summary>
@@ -66,7 +66,7 @@ namespace GameServerManager.Utilities
         /// <returns></returns>
         public static Task ExtractTarGZ(string sourceArchiveFileName, string destinationDirectoryName)
         {
-            return TaskEx.Run(() =>
+            return Task.Run(() =>
             {
                 using Stream fileStream = File.OpenRead(sourceArchiveFileName);
                 using Stream gzipStream = new GZipInputStream(fileStream);

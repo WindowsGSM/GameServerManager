@@ -5,6 +5,7 @@ using GameServerManager.BatchScripts;
 using GameServerManager.Services;
 using WindowsPseudoConsole;
 using WindowsPseudoConsole.Interop.Definitions;
+using GameServerManager.GameServers.Components;
 
 namespace GameServerManager.Utilities
 {
@@ -13,13 +14,14 @@ namespace GameServerManager.Utilities
     /// </summary>
     public class ProcessEx
     {
-        public enum ConsoleType
+        public enum ConsoleMode
         {
-            PseudoConsole, Redirect, Windowed
+            PseudoConsole, Redirect, SrcdsRedirect, Windowed
         }
 
         private Process? _process;
         private ConPTY? _pseudoConsole;
+        private SrcdsControl? _srcdsControl;
         private readonly StringBuilder _output = new();
 
         public Process? Process => _process;
@@ -71,7 +73,7 @@ namespace GameServerManager.Utilities
 
         public string Output => _output.ToString();
 
-        public ConsoleType? Mode { get; private set; }
+        public ConsoleMode? Mode { get; private set; }
 
         public event Action<string>? OutputDataReceived;
         public event Action<int>? Exited;
@@ -79,7 +81,7 @@ namespace GameServerManager.Utilities
 
         public void UsePseudoConsole(ProcessStartInfo processStartInfo)
         {
-            Mode = ConsoleType.PseudoConsole;
+            Mode = ConsoleMode.PseudoConsole;
 
             _pseudoConsole = new()
             {
@@ -93,13 +95,14 @@ namespace GameServerManager.Utilities
 
         public void UseRedirect(ProcessStartInfo processStartInfo)
         {
-            Mode = ConsoleType.Redirect;
+            Mode = ConsoleMode.Redirect;
 
             _process = new()
             {
                 StartInfo = processStartInfo,
+                EnableRaisingEvents = true
             };
-            _process.EnableRaisingEvents = true;
+
             _process.OutputDataReceived += (s, e) =>
             {
                 if (e.Data != null)
@@ -107,6 +110,7 @@ namespace GameServerManager.Utilities
                     AddOutput(e.Data + "\r\n");
                 }
             };
+
             _process.ErrorDataReceived += (s, e) =>
             {
                 if (e.Data != null)
@@ -114,12 +118,23 @@ namespace GameServerManager.Utilities
                     AddOutput("ERROR: " + e.Data + "\r\n");
                 }
             };
+
+            _process.Exited += (s, e) => Exited?.Invoke(_process.ExitCode);
+        }
+
+        public void UseSrcdsRedirect(ProcessStartInfo processStartInfo)
+        {
+            Mode = ConsoleMode.SrcdsRedirect;
+
+            _srcdsControl = new(processStartInfo);
+            _process = _srcdsControl.Process;
+            _process.EnableRaisingEvents = true;
             _process.Exited += (s, e) => Exited?.Invoke(_process.ExitCode);
         }
 
         public void UseWindowed(ProcessStartInfo processStartInfo)
         {
-            Mode = ConsoleType.Windowed;
+            Mode = ConsoleMode.Windowed;
 
             _process = new()
             {
@@ -131,12 +146,14 @@ namespace GameServerManager.Utilities
         {
             ClearOutput();
 
-            if (Mode == ConsoleType.PseudoConsole && _pseudoConsole != null)
+            if (Mode == ConsoleMode.PseudoConsole && _pseudoConsole != null)
             {
                 ProcessInfo processInfo = _pseudoConsole.Start(1000);
                 _process = Process.GetProcessById(processInfo.dwProcessId);
                 _process.EnableRaisingEvents = true;
-                _process.Exited += (s, e) => Exited?.Invoke(_process.ExitCode);
+                _process.Exited += (s, e) => Exited?.Invoke((s as Process).ExitCode);
+
+                Console.WriteLine($"{processInfo.dwProcessId} {processInfo.dwThreadId}");
             }
             else
             {
@@ -145,9 +162,9 @@ namespace GameServerManager.Utilities
                     throw new Exception("Process is null");
                 }
 
-                if (Mode == ConsoleType.Redirect)
+                if (Mode == ConsoleMode.Redirect)
                 {
-                    await TaskEx.Run(() => _process.Start());
+                    await Task.Run(_process.Start);
 
                     if (_process.StartInfo.RedirectStandardOutput)
                     {
@@ -159,6 +176,32 @@ namespace GameServerManager.Utilities
                         _process.BeginErrorReadLine();
                     }
                 }
+                else if (Mode == ConsoleMode.SrcdsRedirect)
+                {
+                    await Task.Run(_process.Start);
+
+                    Task.Run(async () =>
+                    {
+                        int size = _srcdsControl.GetScreenBufferSize();
+                        string newScreenBuffer, screenBuffer = string.Empty;
+
+                        while (true)
+                        {
+                            newScreenBuffer = _srcdsControl.GetScreenBuffer(1, size - 2);
+
+                            if (screenBuffer == newScreenBuffer)
+                            {
+                                continue;
+                            }
+
+                            screenBuffer = newScreenBuffer;
+
+                            Console.WriteLine(newScreenBuffer.Length);
+
+                            await Task.Delay(3000);
+                        }
+                    });
+                }
                 else
                 {
                     string arguments = $"\"{_process.StartInfo.FileName} {_process.StartInfo.Arguments}\" \"{_process.StartInfo.WorkingDirectory}\"";
@@ -167,7 +210,7 @@ namespace GameServerManager.Utilities
 
                     if (int.TryParse(pidString, out int pid))
                     {
-                        _process = await TaskEx.Run(() => Process.GetProcessById(pid));
+                        _process = await Task.Run(() => Process.GetProcessById(pid));
                         _process.EnableRaisingEvents = true;
                         _process.Exited += (s, e) => Exited?.Invoke(_process.ExitCode);
                     }
@@ -179,7 +222,7 @@ namespace GameServerManager.Utilities
                 
                 if (_process != null && !WindowsServiceHelpers.IsWindowsService())
                 {
-                    if (Mode == ConsoleType.Windowed || !_process.StartInfo.CreateNoWindow)
+                    if (Mode == ConsoleMode.Windowed || !_process.StartInfo.CreateNoWindow)
                     {
                         while (!_process.HasExited && !DllImport.ShowWindow(_process.MainWindowHandle, DllImport.WindowShowStyle.Minimize))
                         {
@@ -189,7 +232,7 @@ namespace GameServerManager.Utilities
 
                     try
                     {
-                        await TaskEx.Run(() => _process.WaitForInputIdle());
+                        await Task.Run(_process.WaitForInputIdle);
                     }
                     catch (InvalidOperationException)
                     {
@@ -197,7 +240,7 @@ namespace GameServerManager.Utilities
                         // Ignore this exception
                     }
 
-                    if (Mode == ConsoleType.Windowed || !_process.StartInfo.CreateNoWindow)
+                    if (Mode == ConsoleMode.Windowed || !_process.StartInfo.CreateNoWindow)
                     {
                         DllImport.ShowWindow(_process.MainWindowHandle, DllImport.WindowShowStyle.Hide);
                     }
@@ -232,16 +275,17 @@ namespace GameServerManager.Utilities
 
         public async Task WriteLine(string data)
         {
-            if (Mode == ConsoleType.PseudoConsole)
+            if (Mode == ConsoleMode.PseudoConsole)
             {
-                if (_pseudoConsole != null)
-                {
-                    await _pseudoConsole.WriteLineAsync(data);
-                }
+                _pseudoConsole?.WriteLine(data);
+            }
+            else if (Mode == ConsoleMode.SrcdsRedirect)
+            {
+                _srcdsControl?.Write(data);
             }
             else if (_process != null)
             {
-                if (Mode == ConsoleType.Redirect && _process.StartInfo.RedirectStandardInput)
+                if (Mode == ConsoleMode.Redirect && _process.StartInfo.RedirectStandardInput)
                 {
                     await _process.StandardInput.WriteLineAsync(data);
                     AddOutput(data + "\r\n");
@@ -255,16 +299,17 @@ namespace GameServerManager.Utilities
 
         public async Task Write(string data)
         {
-            if (Mode == ConsoleType.PseudoConsole)
+            if (Mode == ConsoleMode.PseudoConsole)
             {
-                if (_pseudoConsole != null)
-                {
-                    await _pseudoConsole.WriteAsync(data);
-                }
+                _pseudoConsole?.Write(data);
+            }
+            else if (Mode == ConsoleMode.SrcdsRedirect)
+            {
+                _srcdsControl?.Write(data);
             }
             else if (_process != null)
             {
-                if (Mode == ConsoleType.Redirect && _process.StartInfo.RedirectStandardInput)
+                if (Mode == ConsoleMode.Redirect && _process.StartInfo.RedirectStandardInput)
                 {
                     if (data[0] == 13)
                     {

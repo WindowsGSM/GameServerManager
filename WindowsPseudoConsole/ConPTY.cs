@@ -46,7 +46,6 @@ namespace WindowsPseudoConsole
         public bool FilterControlSequences { get; set; } = false;
 
         private Terminal? terminal;
-        private Stream? inputStream;
         private bool disposed;
 
         /// <summary>
@@ -62,9 +61,6 @@ namespace WindowsPseudoConsole
             // Start pseudo console
             terminal = new Terminal();
             ProcessInfo processInfo = terminal.Start($"{FileName}{(string.IsNullOrEmpty(Arguments) ? string.Empty : $" {Arguments}")}", WorkingDirectory, width, height);
-
-            // Save the inputStream
-            inputStream = terminal.Input;
 
             // Read pseudo console output in the background
             Task.Run(() => ReadConPtyOutput(terminal.Output));
@@ -104,8 +100,8 @@ namespace WindowsPseudoConsole
         public void Write(string data)
         {
             var bytes = Encoding.UTF8.GetBytes(data);
-            inputStream?.Write(bytes, 0, bytes.Length);
-            inputStream?.Flush();
+            terminal?.Input.Write(bytes, 0, bytes.Length);
+            terminal?.Input.Flush();
         }
 
         /// <summary>
@@ -128,10 +124,10 @@ namespace WindowsPseudoConsole
         {
             var bytes = Encoding.UTF8.GetBytes(data);
 
-            if (inputStream != null)
+            if (terminal != null)
             {
-                await inputStream.WriteAsync(bytes);
-                await inputStream.FlushAsync();
+                await terminal.Input.WriteAsync(bytes);
+                await terminal.Input.FlushAsync();
             }
         }
 
@@ -161,7 +157,7 @@ namespace WindowsPseudoConsole
                         OutputDataReceived?.Invoke(this, FilterControlSequences ? regex.Replace(outputData, string.Empty) : outputData);
                     }
 
-                    await Task.Delay(1).ConfigureAwait(false);
+                    await Task.Delay(1);
                 }
             }
             catch (ObjectDisposedException)
@@ -185,11 +181,8 @@ namespace WindowsPseudoConsole
 
             if (disposing)
             {
-                
+                terminal?.Dispose();
             }
-
-            terminal?.Dispose();
-            inputStream?.Dispose();
         }
 
         /// <summary>

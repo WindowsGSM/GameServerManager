@@ -22,31 +22,26 @@ namespace GameServerManager.GameServers.Configs
 
         public bool Exists()
         {
-            string path = Path.Combine(GameServerService.ConfigsPath, $"{Guid}.json");
-           
-            return File.Exists(path);
+            return File.Exists(ProgramDataService.Configs.GetPath(Guid));
         }
 
         public Task Update()
         {
-            string path = Path.Combine(GameServerService.ConfigsPath, $"{Guid}.json");
             string contents = JsonSerializer.Serialize<dynamic>(this, new JsonSerializerOptions { WriteIndented = true });
 
-            return File.WriteAllTextAsync(path, contents);
+            return File.WriteAllTextAsync(ProgramDataService.Configs.GetPath(Guid), contents);
         }
 
         public Task Delete()
         {
-            string path = Path.Combine(GameServerService.ConfigsPath, $"{Guid}.json");
-
-            return FileEx.DeleteAsync(path);
+            return FileEx.DeleteAsync(ProgramDataService.Configs.GetPath(Guid));
         }
 
         public async Task<IConfig> Clone()
         {
-            string path = Path.Combine(GameServerService.ConfigsPath, $"{Guid}.json");
+            string json = await File.ReadAllTextAsync(ProgramDataService.Configs.GetPath(Guid));
 
-            return (IConfig)JsonSerializer.Deserialize(await File.ReadAllTextAsync(path), GetType())!;
+            return (IConfig)JsonSerializer.Deserialize(json, GetType())!;
         }
 
         public bool TryGetPropertyInfo(string memberName, [NotNullWhen(true)] out PropertyInfo? tab)

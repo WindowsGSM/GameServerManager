@@ -49,7 +49,7 @@
         {
             _gameServer = GameServer;
         }
-        else if (StorageService.TryGetItem<string>("ImportLastSelect", out string? name))
+        else if (ProgramDataService.Cache.ImportLastSelect.TryRead(out string? name))
         {
             _gameServer = _gameServers.Find(x => x.Config.ClassName == name) ?? _gameServers[0];
         }
@@ -67,7 +67,7 @@
     {
         _gameServer = gameServer;
 
-        StorageService.SetItem("ImportLastSelect", _gameServer.Config.ClassName);
+        ProgramDataService.Cache.ImportLastSelect.Write(_gameServer.Config.ClassName);
     }
 
     private async Task Submit()

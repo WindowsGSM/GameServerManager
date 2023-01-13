@@ -9,7 +9,7 @@ namespace GameServerManager.GameServers.Protocols
         public async Task<IResponse> Query(IProtocolConfig protocolConfig)
         {
             Source source = new(protocolConfig.Protocol.IPAddress, protocolConfig.Protocol.QueryPort);
-            Source.IResponse response = await TaskEx.Run(() => source.GetInfo());
+            Source.IResponse response = await Task.Run(() => source.GetInfo());
 
             ProtocolResponse protocolResponse = new()
             {

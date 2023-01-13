@@ -186,12 +186,12 @@ namespace GameServerManager.GameServers
             // Download zip
             string fileName = $"bedrock-server-{version}.zip";
             string zipPath = Path.Combine(directory, fileName);
-            using HttpResponseMessage response2 = await httpClient.GetAsync($"https://minecraft.azureedge.net/bin-win/{fileName}");
-            response2.EnsureSuccessStatusCode();
+            using HttpResponseMessage response = await httpClient.GetAsync($"https://minecraft.azureedge.net/bin-win/{fileName}");
+            response.EnsureSuccessStatusCode();
 
             using (FileStream fs = new(zipPath, FileMode.CreateNew))
             {
-                await response2.Content.CopyToAsync(fs);
+                await response.Content.CopyToAsync(fs);
             }
 
             // Extract then delete zip

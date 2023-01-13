@@ -55,12 +55,11 @@ namespace WindowsPseudoConsole.Interop
         private void MakeHandleNoninheritable(ref SafeFileHandle handler, IntPtr processHandle)
         {
             // Create noninheritable read handle and close the inheritable read handle.
-            IntPtr handleClone;
             if (!ConsoleApi.DuplicateHandle(
                     processHandle,
                     handler.DangerousGetHandle(),
                     processHandle,
-                    out handleClone,
+                    out IntPtr handleClone,
                     0,
                     false,
                     Constants.DUPLICATE_SAME_ACCESS))

@@ -1,10 +1,17 @@
-﻿using System.Text.RegularExpressions;
+﻿using System.Reflection.Emit;
+using System.Text.RegularExpressions;
+using GameServerManager.Attributes;
 using GameServerManager.GameServers.Components;
 using GameServerManager.GameServers.Configs;
 using GameServerManager.Utilities;
 
 namespace GameServerManager.GameServers.Mods
 {
+    public interface ISourceModConfig
+    {
+        public SourceMod.Config SourceMod { get; set; }
+    }
+
     public class SourceMod : IMod
     {
         public string Name => nameof(SourceMod);
@@ -13,7 +20,20 @@ namespace GameServerManager.GameServers.Mods
 
         public Type ConfigType => typeof(ISourceModConfig);
 
-        public string GetLocalVersion(IGameServer gameServer) => ((ISourceModConfig)gameServer.Config).SourceModLocalVersion;
+        public class InstallConfig
+        {
+            [TextField(Label = "Install Path", HelperText = "SourceMod install directory", Required = true, FolderBrowser = true)]
+            public string Path { get; set; } = "addons/sourcemod";
+        }
+
+        public class Config
+        {
+            public string LocalVersion { get; set; } = string.Empty;
+
+            public InstallConfig Install { get; set; } = new();
+        }
+
+        public string GetLocalVersion(IGameServer gameServer) => ((ISourceModConfig)gameServer.Config).SourceMod.LocalVersion;
 
         public async Task<List<string>> GetVersions()
         {
@@ -48,7 +68,7 @@ namespace GameServerManager.GameServers.Mods
             await DirectoryEx.DeleteAsync(temporaryDirectory, true);
 
             // Update version
-            ((ISourceModConfig)gameServer.Config).SourceModLocalVersion = version;
+            ((ISourceModConfig)gameServer.Config).SourceMod.LocalVersion = version;
             await gameServer.Config.Update();
         }
 
@@ -58,8 +78,9 @@ namespace GameServerManager.GameServers.Mods
 
             // Upgrade https://wiki.alliedmods.net/Upgrading_sourcemod
             string modFolder = ((ISteamCMDConfig)gameServer.Config).SteamCMD.Game;
-            string newPath = Path.Combine(temporaryDirectory, "addons", "sourcemod");
-            string oldPath = Path.Combine(gameServer.Config.Basic.Directory, modFolder, "addons", "sourcemod");
+            string installPath = ((ISourceModConfig)gameServer.Config).SourceMod.Install.Path;
+            string newPath = Path.Combine(temporaryDirectory, installPath);
+            string oldPath = Path.Combine(gameServer.Config.Basic.Directory, modFolder, installPath);
             string[] folders = { "bin", "extensions", "gamedata", "plugins", "translations" };
 
             // Overwrite the folders
@@ -72,7 +93,7 @@ namespace GameServerManager.GameServers.Mods
             await DirectoryEx.DeleteAsync(temporaryDirectory, true);
 
             // Update version
-            ((ISourceModConfig)gameServer.Config).SourceModLocalVersion = version;
+            ((ISourceModConfig)gameServer.Config).SourceMod.LocalVersion = version;
             await gameServer.Config.Update();
         }
 
@@ -80,14 +101,15 @@ namespace GameServerManager.GameServers.Mods
         {
             string modFolder = ((ISteamCMDConfig)gameServer.Config).SteamCMD.Game;
             string modPath = Path.Combine(gameServer.Config.Basic.Directory, modFolder);
+            string installPath = ((ISourceModConfig)gameServer.Config).SourceMod.Install.Path;
 
             // Delete folders and files
-            await DirectoryEx.DeleteIfExistsAsync(Path.Combine(modPath, "addons", "sourcemod"), true);
-            await FileEx.DeleteIfExistsAsync(Path.Combine(modPath, "addons", "metamod", "sourcemod.vdf"));
-            await DirectoryEx.DeleteIfExistsAsync(Path.Combine(modPath, "cfg", "sourcemod"), true);
+            await DirectoryEx.DeleteIfExistsAsync(Path.Combine(modPath, installPath), true);
+            // await FileEx.DeleteIfExistsAsync(Path.Combine(modPath, "addons", "metamod", "sourcemod.vdf"));
+            // await DirectoryEx.DeleteIfExistsAsync(Path.Combine(modPath, "cfg", "sourcemod"), true);
 
             // Update version
-            ((ISourceModConfig)gameServer.Config).SourceModLocalVersion = string.Empty;
+            ((ISourceModConfig)gameServer.Config).SourceMod.LocalVersion = string.Empty;
             await gameServer.Config.Update();
         }
 

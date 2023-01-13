@@ -9,7 +9,7 @@ namespace GameServerManager.GameServers.Protocols
         public async Task<IResponse> Query(IProtocolConfig protocolConfig)
         {
             GameSpy4 gameSpy4 = new(protocolConfig.Protocol.IPAddress, protocolConfig.Protocol.QueryPort);
-            GameSpy4.Status status = await TaskEx.Run(() => gameSpy4.GetStatus());
+            GameSpy4.Status status = await Task.Run(() => gameSpy4.GetStatus());
 
             ProtocolResponse protocolResponse = new()
             {
