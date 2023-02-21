@@ -21,13 +21,13 @@ namespace GameServerManager.GameServers.Configs
         [TextField(Label = "Steam Password", HelperText = "Steam account password", InputType = InputType.Password)]
         public string Password { get; set; } = string.Empty;
 
-        //[TextField(Label = ".maFile Path")]
-        //public string MaFilePath { get; set; } = string.Empty;
+        [TextField(Label = "Steam 2FA Shared Secret", HelperText = "Steam account 2FA shared secret", InputType = InputType.Password)]
+        public string Secret { get; set; } = string.Empty;
 
-        [TextField(Label = "Beta Name", HelperText = "Beta branch name")]
+        [Select(Label = "Branch Name", HelperText = "Beta branch name", GameServerBranches = true)]
         public string BetaName { get; set; } = string.Empty;
 
-        [TextField(Label = "Beta Password", HelperText = "Beta branch password, some beta branches are protected by a password.")]
+        [TextField(Label = "Branch Password", HelperText = "Beta branch password, some beta branches are protected by a password.")]
         public string BetaPassword { get; set; } = string.Empty;
 
         [CheckBox(Label = "Validate On Install", HelperText = "Validate will check all the server files to make sure they match the SteamCMD files.", IsSwitch = true)]

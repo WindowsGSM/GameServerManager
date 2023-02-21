@@ -51,6 +51,7 @@
         {
             files = await ProgramDataService.Logs.GetFiles(_gameServer.Config.Guid);
             selectedFile = files.FirstOrDefault();
+            await ReadLogFileText();
         }
     }
 

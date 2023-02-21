@@ -1,13 +1,39 @@
-﻿using System.Text;
+﻿using System.Collections.Concurrent;
+using System.Net.Http.Json;
+using System.Net;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using GameServerManager.GameServers.Configs;
 using GameServerManager.Services;
 using GameServerManager.Utilities;
+using static GameServerManager.Services.GameServerService;
+using System.Text.Json;
 
 namespace GameServerManager.GameServers.Components
 {
     public static class SteamCMD
     {
+        public class Branch
+        {
+            [JsonPropertyName("buildid")]
+            public string BuildId { get; set; } = string.Empty;
+
+            [JsonPropertyName("description")]
+            public string Description { get; set; } = string.Empty;
+
+            [JsonPropertyName("pwdrequired")]
+            public string PwdRequired { get; set; } = string.Empty;
+
+            [JsonPropertyName("timeupdated")]
+            public string TimeUpdated { get; set; } = string.Empty;
+
+            public bool PasswordRequired => PwdRequired == "1";
+        }
+
+        public static Dictionary<string, Dictionary<string, Branch>> Branches { get; set; } = new();
+
         /// <summary>
         /// Represents errors that occur when build-id mismatch
         /// </summary>
@@ -23,14 +49,14 @@ namespace GameServerManager.GameServers.Components
         /// <summary>
         /// SteamCMD start path
         /// </summary>
-        public static readonly string FileName = Path.Combine(GameServerService.ProcessPath, "steamcmd", "steamcmd.exe");
+        public static readonly string FileName = Path.Combine(ProgramDataService.ProgramDataPath, "steamcmd", "steamcmd.exe");
 
         /// <summary>
         /// Get SteamCMD Command-Line Parameter
         /// </summary>
         /// <param name="gameServer"></param>
         /// <returns></returns>
-        public static string GetParameter(IGameServer gameServer)
+        public static async Task<string> GetParameter(IGameServer gameServer)
         {
             StringBuilder @string = new();
             @string.Append($"+force_install_dir \"{gameServer.Config.Basic.Directory}\" ");
@@ -38,9 +64,11 @@ namespace GameServerManager.GameServers.Components
             SteamCMDConfig steamCMD = ((ISteamCMDConfig)gameServer.Config).SteamCMD;
             @string.Append($"+login {(steamCMD.Username == "anonymous" ? "anonymous" : $"\"{steamCMD.Username}\" \"{steamCMD.Password}\"")} ");
 
-
-            // TODO: maFile 
-
+            if (!string.IsNullOrWhiteSpace(steamCMD.Secret))
+            {
+                string code = await GenerateSteamGuardCode(steamCMD.Secret);
+                @string.Append($"\"{code}\" ");
+            }
 
             if (steamCMD.AppId == "90")
             {
@@ -106,7 +134,7 @@ namespace GameServerManager.GameServers.Components
                 await FileEx.DeleteAsync(zipPath);
             }
 
-            string parameter = GetParameter(gameServer);
+            string parameter = await GetParameter(gameServer);
 
             if (steamCMD.ConsoleMode == "Pseudo Console")
             {
@@ -183,44 +211,140 @@ namespace GameServerManager.GameServers.Components
         }
 
         /// <summary>
-        /// Get Public Build Id from AppInfo
+        /// Get Remote Build Id
         /// </summary>
         /// <param name="gameServer"></param>
-        /// <returns>Public Build Id</returns>
-        /// <exception cref="Exception"></exception>
-        public static async Task<string> GetPublicBuildId(IGameServer gameServer)
-        {
-            string content = await GetAppInfoJson(gameServer);
-            Regex regex = new("\"branches\":\\s*{\\s*\"public\":\\s*{\\s*\"buildid\":\\s*\"(\\S*)\"");
-            MatchCollection matches = regex.Matches(content);
-
-            if (matches.Count <= 0)
-            {
-                throw new Exception("Could not find the public build id");
-            }
-
-            return matches[0].Groups[1].Value;
-        }
-
-        /// <summary>
-        /// Get AppInfo Json
-        /// </summary>
-        /// <param name="gameServer"></param>
-        /// <returns>Json string</returns>
-        public static async Task<string> GetAppInfoJson(IGameServer gameServer)
+        /// <returns></returns>
+        public static string GetRemoteBuildId(IGameServer gameServer)
         {
             SteamCMDConfig steamCMD = ((ISteamCMDConfig)gameServer.Config).SteamCMD;
 
-            using HttpClient httpClient = new();
-            using HttpResponseMessage response = await httpClient.GetAsync($"https://raw.githubusercontent.com/WindowsGSM/SteamAppInfo/main/AppInfo/{steamCMD.AppId}.json");
-            response.EnsureSuccessStatusCode();
+            if (Branches.TryGetValue(steamCMD.AppId, out Dictionary<string, Branch>? branches))
+            {
+                string name = string.IsNullOrWhiteSpace(steamCMD.BetaName) ? branches.First().Key : steamCMD.BetaName;
 
-            return await response.Content.ReadAsStringAsync();
+                if (branches.ContainsKey(name))
+                {
+                    return branches[name].BuildId;
+                }
+            }
+
+            return "Unknown";
         }
 
-        public static async Task<List<string>> GetVersions(IGameServer gameServer)
+        public static async Task FetchBranches()
         {
-            return new() { await GetPublicBuildId(gameServer) };
+            using HttpClient httpClient = new();
+            using HttpResponseMessage response = await httpClient.GetAsync("https://raw.githubusercontent.com/WindowsGSM/SteamAppInfo/main/branches.json");
+            response.EnsureSuccessStatusCode();
+
+            Branches = (await response.Content.ReadFromJsonAsync<Dictionary<string, Dictionary<string, Branch>>>())!;
+        }
+
+        public static async Task<string> GenerateSteamGuardCode(string secret)
+        {
+            return GenerateSteamGuardCodeForTime(secret, await GetSteamTime());
+        }
+
+        /// <summary>
+        /// https://github.com/geel9/SteamAuth/blob/96ca6af3eb03d1a45f7fbff78851f055ba47c0d4/SteamAuth/SteamGuardAccount.cs#L85
+        /// </summary>
+        /// <param name="secret"></param>
+        /// <param name="time"></param>
+        /// <returns></returns>
+        private static string GenerateSteamGuardCodeForTime(string secret, long time)
+        {
+            string sharedSecretUnescaped = Regex.Unescape(secret);
+            byte[] sharedSecretArray = Convert.FromBase64String(sharedSecretUnescaped);
+            byte[] timeArray = new byte[8];
+
+            time /= 30L;
+
+            for (int i = 8; i > 0; i--)
+            {
+                timeArray[i - 1] = (byte)time;
+                time >>= 8;
+            }
+
+            HMACSHA1 hmacGenerator = new()
+            {
+                Key = sharedSecretArray
+            };
+
+            byte[] hashedData = hmacGenerator.ComputeHash(timeArray);
+            byte[] codeArray = new byte[5];
+            byte[] steamGuardCodeTranslations = "23456789BCDFGHJKMNPQRTVWXY"u8.ToArray();
+
+            // May throw error
+            byte b = (byte)(hashedData[19] & 0xF);
+            int codePoint = (hashedData[b] & 0x7F) << 24 | (hashedData[b + 1] & 0xFF) << 16 | (hashedData[b + 2] & 0xFF) << 8 | (hashedData[b + 3] & 0xFF);
+
+            for (int i = 0; i < 5; ++i)
+            {
+                codeArray[i] = steamGuardCodeTranslations[codePoint % steamGuardCodeTranslations.Length];
+                codePoint /= steamGuardCodeTranslations.Length;
+            }
+          
+            return Encoding.UTF8.GetString(codeArray);
+        }
+
+        private static bool _aligned = false;
+        private static int _timeDifference = 0;
+
+        private static async Task<long> GetSteamTime()
+        {
+            if (!_aligned)
+            {
+                await AlignTimeAsync();
+            }
+
+            return GetSystemUnixTime() + _timeDifference;
+        }
+
+        private static async Task AlignTimeAsync()
+        {
+            long currentTime = GetSystemUnixTime();
+
+            using HttpClient httpClient = new();
+            using HttpResponseMessage response = await httpClient.PostAsync("https://api.steampowered.com/ITwoFactorService/QueryTime/v0001", null);
+            response.EnsureSuccessStatusCode();
+
+            QueryTime query = (await response.Content.ReadFromJsonAsync<QueryTime>())!;
+            _timeDifference = (int)(long.Parse(query.Response.ServerTime) - currentTime);
+            _aligned = true;
+        }
+
+        private static long GetSystemUnixTime()
+        {
+            return (long)DateTime.UtcNow.Subtract(new DateTime(1970, 1, 1)).TotalSeconds;
+        }
+
+        /// <summary>
+        /// Example Response: 
+        /// {
+        ///    "response": {
+        ///        "server_time": "1676308005",
+        ///        "skew_tolerance_seconds": "60",
+        ///        "large_time_jink": "86400",
+        ///        "probe_frequency_seconds": 3600,
+        ///        "adjusted_time_probe_frequency_seconds": 300,
+        ///        "hint_probe_frequency_seconds": 60,
+        ///        "sync_timeout": 60,
+        ///        "try_again_seconds": 900,
+        ///        "max_attempts": 3
+        ///     }
+        /// }
+        /// </summary>
+        public class QueryTime
+        {
+            [JsonPropertyName("response")]
+            public TimeQueryResponse Response { get; set; } = new();
+
+            public class TimeQueryResponse
+            {
+                [JsonPropertyName("server_time")]
+                public string ServerTime { get; set; } = string.Empty;
+            }
         }
     }
 }

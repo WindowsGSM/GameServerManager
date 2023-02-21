@@ -13,7 +13,7 @@ namespace GameServerManager.GameServers.Components
     /// <summary>
     /// Game Server Interface
     /// </summary>
-    public interface IGameServer : IVersionable
+    public interface IGameServer
     {
         /// <summary>
         /// Game Server Name
@@ -28,7 +28,12 @@ namespace GameServerManager.GameServers.Components
         /// <summary>
         /// Game Server Query Protocol
         /// </summary>
-        public IProtocol? Protocol { get; }
+        public IQueryProtocol? Protocol { get; }
+
+        /// <summary>
+        /// Game Server Query Response
+        /// </summary>
+        public IQueryResponse? Response { get; set; }
 
         /// <summary>
         /// Game Server Logger
@@ -61,6 +66,31 @@ namespace GameServerManager.GameServers.Components
         #region IGameServer Functions
 
         /// <summary>
+        /// Call when game server exited
+        /// </summary>
+        /// <param name="gameServer"></param>
+        /// <returns></returns>
+        public async Task OnExited(IGameServer gameServer)
+        {
+            if (gameServer.Status == Status.Restarting)
+            {
+                return;
+            }
+
+            if (gameServer.Status == Status.Started && gameServer.Config.Advanced.RestartOnCrash)
+            {
+                gameServer.UpdateStatus(Status.Restarting);
+
+                await Task.Delay(5000);
+                await gameServer.StartAsync();
+            }
+            else
+            {
+                gameServer.UpdateStatus(Status.Stopped);
+            }
+        }
+
+        /// <summary>
         /// Start game server with status update
         /// </summary>
         /// <returns></returns>
@@ -91,12 +121,7 @@ namespace GameServerManager.GameServers.Components
                 throw;
             }
 
-            IResponse? response = await QueryAsync();
-
-            if (response != null)
-            {
-                GameServerService.Responses[Config.Guid] = response;
-            }
+            Response = await QueryAsync();
 
             if (Process.Id != null)
             {
@@ -122,7 +147,7 @@ namespace GameServerManager.GameServers.Components
             {
                 await Stop();
 
-                GameServerService.Responses.Remove(Config.Guid, out _);
+                Response = null;
             }
             catch (Exception ex)
             {
@@ -191,7 +216,7 @@ namespace GameServerManager.GameServers.Components
                     throw new Exception($"Process ID: {Process.Id}");
                 }
 
-                GameServerService.Responses.Remove(Config.Guid, out _);
+                Response = null;
             }
             catch (Exception ex)
             {
@@ -217,7 +242,6 @@ namespace GameServerManager.GameServers.Components
                 await Config.Update();
 
                 GameServerService.AddInstance(this);
-                GameServerService.UpdateServerGuids();
             }
 
             Directory.CreateDirectory(Config.Basic.Directory);
@@ -313,6 +337,16 @@ namespace GameServerManager.GameServers.Components
             }
         }
 
+        public async Task BackupAsync()
+        {
+
+        }
+
+        public async Task RestoreAsync()
+        {
+
+        }
+
         public async Task CloneAsync()
         {
             
@@ -390,7 +424,7 @@ namespace GameServerManager.GameServers.Components
         /// Query game server
         /// </summary>
         /// <returns></returns>
-        public async Task<IResponse?> QueryAsync()
+        public async Task<IQueryResponse?> QueryAsync()
         {
             try
             {
@@ -423,9 +457,11 @@ namespace GameServerManager.GameServers.Components
         /// <returns></returns>
         public bool IsUpdateAvailable()
         {
-            if (GameServerService.Versions.TryGetValue(GetType(), out GameServerService.IVersions? versions) && versions.Versions.Count > 0)
+            ContentVersionService.IContentVersion version = ContentVersionService.GetContentVersion(this);
+
+            if (version.Versions.Count > 0)
             {
-                return Config.LocalVersion != versions.Versions[0];
+                return Config.LocalVersion != version.Versions[0];
             }
 
             return false;

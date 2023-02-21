@@ -12,17 +12,17 @@ namespace GameServerManager.GameServers
     {
         public class MordhauProtocol : SourceProtocol
         {
-            public new async Task<IResponse> Query(IProtocolConfig protocolConfig)
+            public new async Task<IQueryResponse> Query(IProtocolConfig protocolConfig)
             {
                 Source source = new(protocolConfig.Protocol.IPAddress, protocolConfig.Protocol.QueryPort);
                 Source.SourceResponse response = (Source.SourceResponse)await Task.Run(() => source.GetInfo());
 
                 int player = response.Keywords.Split(",").Where(x => x.Split(":")[0] == "B").Select(x => int.Parse(x.Split(":")[1])).FirstOrDefault();
 
-                ProtocolResponse protocolResponse = new()
+                QueryResponse protocolResponse = new()
                 {
                     Name = response.Name,
-                    MapName = response.Map,
+                    Map = response.Map,
                     Player = player,
                     MaxPlayer = response.MaxPlayers,
                     Bot = response.Bots
@@ -90,7 +90,9 @@ namespace GameServerManager.GameServers
 
         public string ImageSource => $"/images/games/{nameof(Mordhau)}.jpg";
 
-        public IProtocol? Protocol => new MordhauProtocol();
+        public IQueryProtocol? Protocol => new MordhauProtocol();
+
+        public IQueryResponse? Response { get; set; }
 
         public ILogger Logger { get; set; } = default!;
 
@@ -99,8 +101,6 @@ namespace GameServerManager.GameServers
         public Status Status { get; set; }
 
         public ProcessEx Process { get; set; } = new();
-
-        public Task<List<string>> GetVersions() => SteamCMD.GetVersions(this);
 
         public async Task Install(string version)
         {

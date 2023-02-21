@@ -4,17 +4,17 @@ using GameServerManager.Utilities;
 
 namespace GameServerManager.GameServers.Protocols
 {
-    public class SourceProtocol : IProtocol
+    public class SourceProtocol : IQueryProtocol
     {
-        public async Task<IResponse> Query(IProtocolConfig protocolConfig)
+        public async Task<IQueryResponse> Query(IProtocolConfig protocolConfig)
         {
             Source source = new(protocolConfig.Protocol.IPAddress, protocolConfig.Protocol.QueryPort);
             Source.IResponse response = await Task.Run(() => source.GetInfo());
 
-            ProtocolResponse protocolResponse = new()
+            QueryResponse protocolResponse = new()
             {
                 Name = response.Name,
-                MapName = response.Map,
+                Map = response.Map,
                 Player = response.Players,
                 MaxPlayer = response.MaxPlayers,
                 Bot = response.Bots,

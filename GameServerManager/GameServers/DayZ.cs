@@ -7,25 +7,27 @@ using ILogger = Serilog.ILogger;
 
 namespace GameServerManager.GameServers
 {
-    /// <summary>
-    /// Subsistence Dedicated Server
-    /// </summary>
-    public class Subsistence : IGameServer
+    public class DayZ : IGameServer
     {
         public class StartConfig : IStartConfig
         {
-            [TextField(Label = "Start Path", HelperText = "Path to start the application.", Required = true)]
-            public string StartPath { get; set; } = "Binaries\\Win64\\UDK.exe";
+            [TextField(Label = "Start Path", Required = true)]
+            public string StartPath { get; set; } = "DayZServer_x64.exe";
 
-            [TextField(Label = "Start Parameter", HelperText = "Command-line arguments to use when starting the application.")]
-            public string StartParameter { get; set; } = "server coldmap1?steamsockets -log";
+            [TextField(Label = "Start Parameter")]
+            public string StartParameter { get; set; } = "-config=serverDZ.cfg -port=2302 -profiles=profiles -doLogs -adminLog -netLog";
+
+            [RadioGroup(Text = "Console Mode")]
+            [Radio(Option = "Redirect")]
+            [Radio(Option = "Windowed")]
+            public string ConsoleMode { get; set; } = "Redirect";
         }
 
         public class Configuration : IConfig, ISteamCMDConfig, IProtocolConfig
         {
             public string LocalVersion { get; set; } = string.Empty;
 
-            public string ClassName => nameof(Subsistence);
+            public string ClassName { get; init; } = nameof(DayZ);
 
             public Guid Guid { get; set; }
 
@@ -40,7 +42,6 @@ namespace GameServerManager.GameServers
             {
                 Entries =
                 {
-                    "UDKGame"
                 }
             };
 
@@ -50,8 +51,7 @@ namespace GameServerManager.GameServers
             [TabPanel(Text = "SteamCMD", Description = "SteamCMD Configuration")]
             public SteamCMDConfig SteamCMD { get; set; } = new()
             {
-                AppId = "1362640",
-                Username = "anonymous"
+                AppId = "223350"
             };
 
             [TabPanel(Text = "Protocol", Description = "Protocol Configuration")]
@@ -61,11 +61,11 @@ namespace GameServerManager.GameServers
             };
         }
 
-        public string Name => "Subsistence Dedicated Server";
+        public string Name => "DayZ Dedicated Server";
 
-        public string ImageSource => $"/images/games/{nameof(Subsistence)}.jpg";
+        public string ImageSource => $"/images/games/{nameof(DayZ)}.jpg";
 
-        public IQueryProtocol? Protocol => new SourceProtocol();
+        public IQueryProtocol? Protocol => null;
 
         public IQueryResponse? Response { get; set; }
 
@@ -81,9 +81,13 @@ namespace GameServerManager.GameServers
         {
             await SteamCMD.Start(this, version);
 
-            // Once downloaded, the app needs to be run once to generate the UDK*.ini files
-            await Start();
-            await Stop();
+            string path = Path.Combine(Config.Basic.Directory, "serverDZ.cfg");
+            string text = await File.ReadAllTextAsync(path);
+
+            // Replace "EXAMPLE NAME" to name
+            text = text.Replace("EXAMPLE NAME", Config.Basic.Name);
+
+            await File.WriteAllTextAsync(path, text);
         }
 
         public Task Update(string version) => SteamCMD.Start(this, version);
@@ -102,16 +106,11 @@ namespace GameServerManager.GameServers
             return Process.Start();
         }
 
-        public async Task Stop()
+        public Task Stop()
         {
             Process.Kill();
 
-            bool exited = await Process.WaitForExit((int)TimeSpan.FromSeconds(10).TotalMilliseconds);
-
-            if (!exited)
-            {
-                throw new Exception("Process fail to stop");
-            }
+            return Task.CompletedTask;
         }
     }
 }

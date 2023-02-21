@@ -12,7 +12,7 @@ namespace GameServerManager.GameServers
     /// <summary>
     /// Minecraft: Bedrock Edition (PocketMine-MP)
     /// </summary>
-    public class PMMP : IGameServer
+    public class PMMP : IGameServer, IVersionable
     {
         public class StartConfig : IStartConfig
         {
@@ -32,7 +32,7 @@ namespace GameServerManager.GameServers
         public class InstallConfig
         {
             [TextField(Label = "PHP Download Url", HelperText = "PHP download url for PMMP", Required = true)]
-            public string PhpDownloadUrl { get; set; } = "https://jenkins.pmmp.io/job/PHP-8.0-Aggregate/lastStableBuild/artifact/PHP-8.0-Windows-x64.zip";
+            public string PhpDownloadUrl { get; set; } = "https://github.com/pmmp/PHP-Binaries/releases/download/php-8.0-latest/PHP-Windows-x64-PM5.zip";
 
             [CheckBox(Label = "I accept the terms of PocketMine-MP’s license. You can read the full text of the license on [GitHub](https://github.com/pmmp/PocketMine-MP/blob/master/LICENSE).", Required = true, RequiredError = "You must agree")]
             public bool PocketMineMPLicense { get; set; }
@@ -72,7 +72,9 @@ namespace GameServerManager.GameServers
 
         public string ImageSource => $"/images/games/{nameof(PMMP)}.jpg";
 
-        public IProtocol? Protocol => new GameSpy4Protocol();
+        public IQueryProtocol? Protocol => new GameSpy4Protocol();
+
+        public IQueryResponse? Response { get; set; }
 
         public ILogger Logger { get; set; } = default!;
 

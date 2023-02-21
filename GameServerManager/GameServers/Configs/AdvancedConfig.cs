@@ -19,7 +19,7 @@ namespace GameServerManager.GameServers.Configs
         [CheckBox(Label = "Restart on Crash", HelperText = "Automatically restart the server when the server crashes unexpectedly.", IsSwitch = true)]
         public bool RestartOnCrash { get; set; }
 
-        [CheckBox(Label = "Auto Update and Restart", HelperText = "Automatically stop and update the server and start the server when an update is available. This function only runs when the server is started.", IsSwitch = true)]
-        public bool AutoUpdateAndRestart { get; set; }
+        [CheckBox(Label = "Update on Start", HelperText = "Update the server when an update is available and start the server.", IsSwitch = true)]
+        public bool UpdateOnStart { get; set; }
     }
 }

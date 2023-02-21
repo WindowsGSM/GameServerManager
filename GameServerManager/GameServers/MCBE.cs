@@ -9,7 +9,7 @@ using ILogger = Serilog.ILogger;
 
 namespace GameServerManager.GameServers
 {
-    public class MCBE : IGameServer
+    public class MCBE : IGameServer, IVersionable
     {
         public class StartConfig : IStartConfig
         {
@@ -60,7 +60,9 @@ namespace GameServerManager.GameServers
 
         public string ImageSource => $"/images/games/{nameof(MCBE)}.jpg";
 
-        public IProtocol? Protocol => null;
+        public IQueryProtocol? Protocol => null;
+
+        public IQueryResponse? Response { get; set; }
 
         public ILogger Logger { get; set; } = default!;
 

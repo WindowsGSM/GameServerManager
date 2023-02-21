@@ -45,7 +45,7 @@
                 <MudDivider Vertical="true" FlexItem="true" Class="ma-4" />
 
                 <MudTooltip Text="Browse Server Files">
-                    <MudIconButton Icon="@Icons.Filled.Folder" Color="Color.Warning" OnClick="@((e) => OpenFileExplorer(_gameServer))" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Folder" Color="Color.Warning" OnClick="@((e) => OpenFileExplorer(_gameServer))" />
                 </MudTooltip>
 
                 @*<MudTooltip Text="Browse Backup Files">
@@ -64,33 +64,35 @@
                 <MudDivider Vertical="true" FlexItem="true" Class="ma-4" />
 
                 <MudTooltip Text="View Event Logs">
-                    <MudIconButton Icon="@Icons.Filled.Event" Color="Color.Inherit" OnClick="@((e) => NavigateToLogs(_gameServer.Config.Guid))" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Event" Color="Color.Inherit" OnClick="@((e) => NavigateToLogs(_gameServer.Config.Guid))" />
                 </MudTooltip>
 
                 <MudTooltip Text="Configuation">
-                    <MudIconButton Icon="@Icons.Filled.Settings" Color="Color.Inherit" OnClick="@((e) => NavigateToConfiguration(_gameServer.Config.Guid))" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Settings" Color="Color.Inherit" OnClick="@((e) => NavigateToConfiguration(_gameServer.Config.Guid))" />
                 </MudTooltip>
 
                 <MudSpacer />
 
                 <MudTooltip Text="Clone">
-                    <MudIconButton Icon="@Icons.Filled.ContentCopy" Color="Color.Inherit" OnClick="@((e) => {})" />
+                    <MudIconButton Icon="@Icons.Material.Filled.ContentCopy" Color="Color.Inherit" OnClick="@((e) => {})" />
                 </MudTooltip>
 
                 <MudTooltip Text="Fork">
-                    <MudIconButton Icon="@Icons.Filled.ForkRight" Color="Color.Inherit" OnClick="@((e) => {})" />
+                    <MudIconButton Icon="@Icons.Material.Filled.ForkRight" Color="Color.Inherit" OnClick="@((e) => {})" />
                 </MudTooltip>
 
                 <MudTooltip Text="@(Operation.Delete.ToString())">
-                    <MudIconButton Icon="@Icons.Filled.DeleteForever" Color="Color.Inherit" OnClick="@((e) => Delete(_gameServer))" Disabled="@(_gameServer.Status.IsDisabled(Operation.Delete))" />
+                    <MudIconButton Icon="@Icons.Material.Filled.DeleteForever" Color="Color.Inherit" OnClick="@((e) => Delete(_gameServer))" Disabled="@(_gameServer.Status.IsDisabled(Operation.Delete))" />
                 </MudTooltip>
             </MudToolBar>
         </MudPaper>
 
-        <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true">
-            <MudTabPanel Text="Console" Icon="@Icons.Material.Filled.Terminal">
-                @* Search Bar for Xterm*@
-                @*<div class="pa-1" style="background-color:black;">
+        @if (_gameServer.Process.Mode != ProcessEx.ConsoleMode.Windowed)
+        {
+            <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true">
+                <MudTabPanel Text="Console" Icon="@Icons.Material.Filled.Terminal">
+                    @* Search Bar for Xterm*@
+                    @*<div class="pa-1" style="background-color:black;">
                     <MudTextField 
                         Style="color:white;"
                         Margin="Margin.Dense"
@@ -102,16 +104,16 @@
                         AdornmentIcon="@Icons.Filled.Search"
                         AdornmentColor="Color.Info"
                         OnAdornmentClick="@Search" />
-                </div>*@
+                    </div>*@
 
-                <div style="background-color:black;">
-                    <Xterm @ref="_terminal" Options="_options" AddonIds="_addonIds" OnFirstRender="@OnXtermRender" OnKey="@OnKey" />
-                </div>
+                    <div style="background-color:black;">
+                        <Xterm @ref="_terminal" Options="_options" AddonIds="_addonIds" OnFirstRender="@OnXtermRender" OnKey="@OnKey" />
+                    </div>
 
-                @if (_gameServer.Process.Mode == ProcessEx.ConsoleMode.Redirect || _gameServer.Process.Mode == ProcessEx.ConsoleMode.SrcdsRedirect)
-                {
-                    <div class="pa-1" style="background-color:black;border-bottom-left-radius:var(--mud-default-borderradius);border-bottom-right-radius:var(--mud-default-borderradius);">
-                        <MudTextField
+                    @if (_gameServer.Process.Mode == ProcessEx.ConsoleMode.Redirect || _gameServer.Process.Mode == ProcessEx.ConsoleMode.SrcdsRedirect)
+                    {
+                        <div class="pa-1" style="background-color:black;border-bottom-left-radius:var(--mud-default-borderradius);border-bottom-right-radius:var(--mud-default-borderradius);">
+                            <MudTextField
                             T="string"
                             @ref="_commandTextField"
                             Immediate="true"
@@ -121,15 +123,16 @@
                             Placeholder="@(_gameServer.Status == Status.Started ? "Command" : string.Empty)"
                             IconSize="Size.Small"
                             Adornment="Adornment.End"
-                            AdornmentIcon="@Icons.Filled.Send"
+                            AdornmentIcon="@Icons.Material.Filled.Send"
                             AdornmentColor="Color.Info"
                             OnAdornmentClick="@((e) => SendCommand())"
                             OnKeyDown="OnKeyDown"
                             Disabled="@(_gameServer.Status != Status.Started)" />
-                    </div>
-                }
-            </MudTabPanel>
-        </MudTabs>
+                        </div>
+                    }
+                </MudTabPanel>
+            </MudTabs>
+        }
     }
 </MudContainer>
 
@@ -249,10 +252,9 @@
                     await _gameServer.Process.Write(args.Key);
                 }
             }
-            catch (Exception e)
+            catch
             {
                 // Cannot write (Ignore)
-                // _terminal?.WriteLine($"OnKey Cannot write {e}");
             }
         }
     }
@@ -282,7 +284,6 @@
             catch (Exception e)
             {
                 // Cannot write (Ignore)
-                _terminal?.WriteLine($"SendCommand Cannot write {e}");
             }
 
             await _commandTextField.Clear();
@@ -358,7 +359,7 @@
         IDialogReference dialogReference = DialogService.Show<GameServerInstallDialog>($"Install {gameServer.Name}", parameters, options);
         DialogResult dialogResult = await dialogReference.Result;
 
-        if (dialogResult.Cancelled)
+        if (dialogResult.Canceled)
         {
             return;
         }
@@ -393,7 +394,7 @@
         IDialogReference dialogReference = DialogService.Show<GameServerUpdateDialog>($"Update {gameServer.Name}", parameters, options);
         DialogResult dialogResult = await dialogReference.Result;
 
-        if (dialogResult.Cancelled)
+        if (dialogResult.Canceled)
         {
             return;
         }
@@ -427,7 +428,7 @@
         IDialogReference dialogReference = DialogService.Show<GameServerDeleteDialog>("", parameters, options);
         DialogResult dialogResult = await dialogReference.Result;
 
-        if (dialogResult.Cancelled)
+        if (dialogResult.Canceled)
         {
             return;
         }
@@ -467,14 +468,14 @@
         IDialogReference dialogReference = DialogService.Show<GameServerBackupDialog>("", parameters, options);
         DialogResult dialogResult = await dialogReference.Result;
 
-        if (dialogResult.Cancelled)
+        if (dialogResult.Canceled)
         {
             return;
         }
 
         try
         {
-            await GameServerService.Backup(gameServer);
+            await gameServer.BackupAsync();
             Snackbar.Add($"{gameServer.Config.Basic.Name}: Backuped", Severity.Success);
         }
         catch (Exception e)
@@ -499,7 +500,7 @@
         IDialogReference dialogReference = DialogService.Show<GameServerRestoreDialog>("", parameters, options);
         DialogResult dialogResult = await dialogReference.Result;
 
-        if (dialogResult.Cancelled)
+        if (dialogResult.Canceled)
         {
             return;
         }
@@ -507,7 +508,7 @@
         try
         {
             // TODO: restore file
-            await GameServerService.Restore(gameServer, string.Empty);
+            await gameServer.RestoreAsync();
             Snackbar.Add($"{gameServer.Config.Basic.Name}: Restored", Severity.Success);
         }
         catch (Exception e)
@@ -532,7 +533,7 @@
         IDialogReference dialogReference = DialogService.Show<ModDialog>($"Install {mod.Name}", parameters, options);
         DialogResult dialogResult = await dialogReference.Result;
 
-        if (dialogResult.Cancelled)
+        if (dialogResult.Canceled)
         {
             return;
         }
@@ -566,7 +567,7 @@
         IDialogReference dialogReference = DialogService.Show<ModDialog>($"Update {mod.Name}", parameters, options);
         DialogResult dialogResult = await dialogReference.Result;
 
-        if (dialogResult.Cancelled)
+        if (dialogResult.Canceled)
         {
             return;
         }
@@ -599,7 +600,7 @@
         IDialogReference dialogReference = DialogService.Show<ModDialog>($"Delete {mod.Name}", parameters, options);
         DialogResult dialogResult = await dialogReference.Result;
 
-        if (dialogResult.Cancelled)
+        if (dialogResult.Canceled)
         {
             return;
         }

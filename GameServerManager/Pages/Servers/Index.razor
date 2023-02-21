@@ -39,15 +39,13 @@
                 <MudChip Variant="Variant.Outlined" Size="Size.Small" Color="@context.Status.ToColor()">@context.Status.ToStringEx()</MudChip>
             </MudTd>
             <MudTd DataLabel="Name">@context.Config.Basic.Name</MudTd>
-            <MudTd DataLabel="Map">@GameServerService.GetResponse(context)?.MapName</MudTd>
+            <MudTd DataLabel="Map">@context.Response?.Map</MudTd>
             <MudTd DataLabel="Players">
                 @if (context.Config is IProtocolConfig protocolConfig)
                 {
-                    var response = GameServerService.GetResponse(context);
-
-                    if (response != null)
+                    if (context.Response != null)
                     {
-                        <span>@response.Player / @response.MaxPlayer</span>
+                        <span>@context.Response.Player / @context.Response.MaxPlayer</span>
                     }
                 }
             </MudTd>
@@ -238,7 +236,6 @@
         await gameServer.Config.Update();
 
         GameServerService.AddInstance(gameServer);
-        GameServerService.UpdateServerGuids();
 
         Snackbar.Add($"{gameServer.Config.Basic.Name}: Imported", Severity.Success);
     }

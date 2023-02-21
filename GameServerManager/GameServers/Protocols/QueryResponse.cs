@@ -1,10 +1,10 @@
 ﻿namespace GameServerManager.GameServers.Protocols
 {
-    public class ProtocolResponse : IResponse
+    public class QueryResponse : IQueryResponse
     {
         public string Name { get; set; } = string.Empty;
 
-        public string MapName { get; set; } = string.Empty;
+        public string Map { get; set; } = string.Empty;
 
         public int Player { get; set; }
 

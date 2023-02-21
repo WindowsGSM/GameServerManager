@@ -1,10 +1,10 @@
 ﻿namespace GameServerManager.GameServers.Protocols
 {
-    public interface IResponse
+    public interface IQueryResponse
     {
         public string Name { get; set; }
 
-        public string MapName { get; set; }
+        public string Map { get; set; }
 
         public int Player { get; set; }
 

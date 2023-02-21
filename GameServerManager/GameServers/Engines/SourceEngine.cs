@@ -64,9 +64,11 @@ namespace GameServerManager.GameServers.Engines
 
         public virtual string ImageSource => string.Empty;
 
-        public virtual IProtocol? Protocol => new SourceProtocol();
+        public IQueryProtocol? Protocol => new SourceProtocol();
 
-        public virtual ILogger Logger { get; set; } = default!;
+        public IQueryResponse? Response { get; set; }
+
+        public ILogger Logger { get; set; } = default!;
 
         public virtual IConfig Config { get; set; } = new Configuration();
 
@@ -84,8 +86,6 @@ namespace GameServerManager.GameServers.Engines
                 File.ReadAllText(Path.Combine(path, "steam_appid.txt")).Equals(((ISteamCMDConfig)Config).SteamCMD.AppId);
             });
         }
-
-        public virtual Task<List<string>> GetVersions() => SteamCMD.GetVersions(this);
 
         public virtual Task Install(string version) => SteamCMD.Start(this, version);
 

@@ -11,6 +11,8 @@
         public Type? SelectItemsType { get; set; }
 
         public string HelperText { get; set; } = string.Empty;
+
+        public bool GameServerBranches { get; set; }
     }
 
     public interface ISelectItem

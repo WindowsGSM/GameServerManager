@@ -41,7 +41,7 @@ namespace GameServerManager.Services
             /// </summary>
             public static readonly string Path = System.IO.Path.Combine(ProgramDataPath, "Data");
 
-            public static readonly JsonFile<List<string>> ServerGuids = new(nameof(ServerGuids), Path);
+            public static readonly JsonFile<List<string>> ServersOrder = new(nameof(ServersOrder), Path);
         }
 
         /// <summary>

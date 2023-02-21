@@ -2,8 +2,8 @@
 
 namespace GameServerManager.GameServers.Protocols
 {
-    public interface IProtocol
+    public interface IQueryProtocol
     {
-        public Task<IResponse> Query(IProtocolConfig protocolConfig);
+        public Task<IQueryResponse> Query(IProtocolConfig protocolConfig);
     }
 }

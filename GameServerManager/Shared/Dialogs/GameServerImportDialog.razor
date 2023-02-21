@@ -39,7 +39,7 @@
     private IGameServer _gameServer = null!;
     private Guid _guid = Guid.NewGuid();
     private BasicConfig _basic = new();
-    private MudForm _form = null!;
+    private MudForm? _form = null!;
 
     protected override void OnInitialized()
     {
@@ -59,7 +59,7 @@
         }
 
         _guid = GameServer == null ? Guid.NewGuid() : GameServer.Config.Guid;
-        _basic = GameServer == null ? GameServerService.GetNewBasicConfig(_guid) : GameServer.Config.Basic;
+        _basic = GameServer == null ? BasicConfig.CreateNew(_guid) : GameServer.Config.Basic;
         _basic.Directory = string.Empty;
     }
 

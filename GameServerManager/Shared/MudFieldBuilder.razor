@@ -167,20 +167,45 @@
     }
     else if (field.TryGetCustomAttribute<SelectAttribute>(out SelectAttribute? select))
     {
-        ISelectItem o = (ISelectItem)Activator.CreateInstance(select.SelectItemsType!)!;
+        @if (select.GameServerBranches)
+        {
+            Dictionary<string, SteamCMD.Branch> branches = SteamCMD.Branches[((ISteamCMDConfig)GameServer.Config).SteamCMD.AppId];
+            string value = field.GetValue(_config)?.ToString();
 
-        <MudSelect
-            T="string"
-            Label="@select.Label"
-            Value="@(field.GetValue(_config)?.ToString())"
-            SelectedValuesChanged="@((e) => field.SetValue(_config, e.FirstOrDefault()))"
-            AnchorOrigin="Origin.BottomCenter"
-            HelperText="@select.HelperText">
-            @foreach (string selectItem in o.Values)
+            if (string.IsNullOrWhiteSpace(value))
             {
-                <MudSelectItem Value="@(selectItem)" />
+                value = branches.First().Key;
             }
-        </MudSelect>
+
+            <MudSelect
+                T="string"
+                Label="@select.Label"
+                Value="@value"
+                SelectedValuesChanged="@((e) => field.SetValue(_config, e.FirstOrDefault()))"
+                AnchorOrigin="Origin.BottomCenter"
+                HelperText="@select.HelperText">
+                @foreach (KeyValuePair<string, SteamCMD.Branch> entry in branches)
+                {
+                    <MudSelectItem Value="@entry.Key">@(entry.Value.PasswordRequired ? "🔒 " : "") @entry.Key</MudSelectItem>
+                }
+            </MudSelect>
+        }
+        else
+        {
+            ISelectItem o = (ISelectItem)Activator.CreateInstance(select.SelectItemsType!)!;
+
+            <MudSelect T="string"
+                Label="@select.Label"
+                Value="@(field.GetValue(_config)?.ToString())"
+                SelectedValuesChanged="@((e) => field.SetValue(_config, e.FirstOrDefault()))"
+                AnchorOrigin="Origin.BottomCenter"
+                HelperText="@select.HelperText">
+                @foreach (string selectItem in o.Values)
+                {
+                    <MudSelectItem Value="@(selectItem)" />
+                }
+            </MudSelect>
+        }
     }
 }
 
@@ -190,6 +215,9 @@
 
     [Parameter]
     public IConfig Config { get; set; } = null!;
+
+    [Parameter]
+    public IGameServer GameServer { get; set; } = null!;
 
     private PropertyInfo[] _fields { get; set; } = new PropertyInfo[0];
     private object? _config;

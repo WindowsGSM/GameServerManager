@@ -24,6 +24,8 @@ builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
 builder.Services.AddSingleton<GameServerService>();
 builder.Services.AddSingleton<IHostedService>(p => p.GetRequiredService<GameServerService>());
+builder.Services.AddSingleton<ContentVersionService>();
+builder.Services.AddSingleton<IHostedService>(p => p.GetRequiredService<ContentVersionService>());
 builder.Services.AddSingleton<SystemMetricsService>();
 //builder.Services.AddSingleton<IHostedService>(p => p.GetService<SystemMetricsService>()!);
 builder.Services.AddMudServices(config =>

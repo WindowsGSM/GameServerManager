@@ -1,6 +1,7 @@
 ﻿@page "/servers/{Guid:guid}/version"
 @inject NavigationManager NavigationManager
 @inject GameServerService GameServerService
+@inject ContentVersionService ContentVersionService
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
 
@@ -36,13 +37,9 @@
 
                 <MudTextField T="string" Label="Local Version" ReadOnly="true" Value="@_gameServer.Config.LocalVersion" Placeholder="Not Installed" />
 
-                GameServerService.IVersions? versionData = GameServerService.GetVersions(_gameServer);
+                ContentVersionService.IContentVersion version = ContentVersionService.GetContentVersion(_gameServer);
 
-                <MudTextField T="string"
-                    Label="Latest Stable Version"
-                    ReadOnly="true"
-                    Value="@versionData?.LatestVersion"
-                    HelperText="@($"Last fetch: {(versionData?.DateTime.ToString() ?? "-")}")" />
+                <MudTextField T="string" Label="Latest Stable Version" ReadOnly="true" Value="@version.LatestVersion" HelperText="@($"Last fetch: {(version.DateTime.ToString() ?? "-")}")" />
             }
 
             @foreach (IMod mod in GameServerService.Mods)
@@ -66,13 +63,9 @@
 
                     <MudTextField T="string" Label="Local Version" ReadOnly="true" Value="@(mod.GetLocalVersion(_gameServer))" Placeholder="Not Installed" />
 
-                    GameServerService.IVersions? versionData2 = GameServerService.GetVersions(mod);
+                    ContentVersionService.IContentVersion version2 = ContentVersionService.GetContentVersion(mod);
 
-                    <MudTextField T="string"
-                          Label="Latest Stable Version"
-                          ReadOnly="true"
-                          Value="@((versionData2 == null || versionData2.Versions.Count <= 0) ? string.Empty : versionData2.Versions[0])"
-                          HelperText="@($"Last fetch: {(versionData2?.DateTime.ToString() ?? "-")}")" />
+                    <MudTextField T="string" Label="Latest Stable Version" ReadOnly="true" Value="@(version2.Versions.Count <= 0 ? string.Empty : version2.Versions[0])" HelperText="@($"Last fetch: {version2.DateTime}")" />
                 }
             }
         </MudPaper>
