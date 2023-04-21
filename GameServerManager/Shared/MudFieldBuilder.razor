@@ -170,7 +170,7 @@
         @if (select.GameServerBranches)
         {
             Dictionary<string, SteamCMD.Branch> branches = SteamCMD.Branches[((ISteamCMDConfig)GameServer.Config).SteamCMD.AppId];
-            string value = field.GetValue(_config)?.ToString();
+            string? value = field.GetValue(_config)?.ToString();
 
             if (string.IsNullOrWhiteSpace(value))
             {
@@ -214,7 +214,7 @@
     public PropertyInfo Tab { get; set; } = null!;
 
     [Parameter]
-    public IConfig Config { get; set; } = null!;
+    public object Config { get; set; } = null!;
 
     [Parameter]
     public IGameServer GameServer { get; set; } = null!;

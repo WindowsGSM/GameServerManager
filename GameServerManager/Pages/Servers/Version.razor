@@ -27,19 +27,25 @@
                 <div class="mt-2 mb-3">
                     @if (string.IsNullOrEmpty(_gameServer.Config.LocalVersion))
                     {
-                        <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Success" StartIcon="@Icons.Filled.FileDownload" OnClick="@((e) => Install(_gameServer))" Disabled="@_gameServer.Status.IsDisabled(Operation.Install)">Install</MudButton>
+                        <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Success" StartIcon="@Icons.Material.Filled.FileDownload" OnClick="@((e) => Install(_gameServer))" Disabled="@_gameServer.Status.IsDisabled(Operation.Install)">Install</MudButton>
                     }
                     else
                     {
-                        <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Warning" StartIcon="@Icons.Filled.KeyboardDoubleArrowUp" OnClick="@((e) => Update(_gameServer))" Disabled="@_gameServer.Status.IsDisabled(Operation.Update)">Update</MudButton>
+                        <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Warning" StartIcon="@Icons.Material.Filled.KeyboardDoubleArrowUp" OnClick="@((e) => Update(_gameServer))" Disabled="@_gameServer.Status.IsDisabled(Operation.Update)">Update</MudButton>
                     }
                 </div>
 
                 <MudTextField T="string" Label="Local Version" ReadOnly="true" Value="@_gameServer.Config.LocalVersion" Placeholder="Not Installed" />
 
                 ContentVersionService.IContentVersion version = ContentVersionService.GetContentVersion(_gameServer);
+                string helperText = $"Last fetch: {(version.DateTime.ToString() ?? "-")}";
 
-                <MudTextField T="string" Label="Latest Stable Version" ReadOnly="true" Value="@version.LatestVersion" HelperText="@($"Last fetch: {(version.DateTime.ToString() ?? "-")}")" />
+                if (version.Branch != null)
+                {
+                    helperText += $", Branch: {version.Branch}";
+                }
+
+                <MudTextField T="string" Label="Latest Stable Version" Value="@version.LatestVersion" ReadOnly="true" HelperText="@helperText" />
             }
 
             @foreach (IMod mod in GameServerService.Mods)
@@ -50,18 +56,18 @@
                     <MudText Typo="Typo.body2">@mod.Description</MudText>
 
                     <div class="mt-2 mb-3">
-                        @if (string.IsNullOrEmpty(mod.GetLocalVersion(_gameServer)))
+                        @if (string.IsNullOrEmpty(mod.GetModConfig(_gameServer).LocalVersion))
                         {
-                            <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Success" StartIcon="@Icons.Filled.FileDownload" OnClick="@((e) => InstallMod(_gameServer, mod))" Disabled="@_gameServer.Status.IsDisabled(Operation.InstallMod)">Install</MudButton>
+                            <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Success" StartIcon="@Icons.Material.Filled.FileDownload" OnClick="@((e) => InstallMod(_gameServer, mod))" Disabled="@_gameServer.Status.IsDisabled(Operation.InstallMod)">Install</MudButton>
                         }
                         else
                         {
-                            <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Warning" StartIcon="@Icons.Filled.KeyboardDoubleArrowUp" OnClick="@((e) => UpdateMod(_gameServer, mod))" Disabled="@_gameServer.Status.IsDisabled(Operation.UpdateMod)">Update</MudButton>
-                            <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Filled.Delete" OnClick="@((e) => DeleteMod(_gameServer, mod))" Disabled="@_gameServer.Status.IsDisabled(Operation.DeleteMod)">Delete</MudButton>
+                            <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Warning" StartIcon="@Icons.Material.Filled.KeyboardDoubleArrowUp" OnClick="@((e) => UpdateMod(_gameServer, mod))" Disabled="@_gameServer.Status.IsDisabled(Operation.UpdateMod)">Update</MudButton>
+                            <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.Delete" OnClick="@((e) => DeleteMod(_gameServer, mod))" Disabled="@_gameServer.Status.IsDisabled(Operation.DeleteMod)">Delete</MudButton>
                         }
                     </div>
 
-                    <MudTextField T="string" Label="Local Version" ReadOnly="true" Value="@(mod.GetLocalVersion(_gameServer))" Placeholder="Not Installed" />
+                    <MudTextField T="string" Label="Local Version" ReadOnly="true" Value="@(mod.GetModConfig(_gameServer).LocalVersion)" Placeholder="Not Installed" />
 
                     ContentVersionService.IContentVersion version2 = ContentVersionService.GetContentVersion(mod);
 
@@ -105,7 +111,7 @@
         IDialogReference dialogReference = DialogService.Show<GameServerInstallDialog>($"Install {gameServer.Name}", parameters, options);
         DialogResult dialogResult = await dialogReference.Result;
 
-        if (dialogResult.Cancelled)
+        if (dialogResult.Canceled)
         {
             return;
         }
@@ -140,7 +146,7 @@
         IDialogReference dialogReference = DialogService.Show<GameServerUpdateDialog>($"Update {gameServer.Name}", parameters, options);
         DialogResult dialogResult = await dialogReference.Result;
 
-        if (dialogResult.Cancelled)
+        if (dialogResult.Canceled)
         {
             return;
         }
@@ -161,20 +167,21 @@
     private async Task InstallMod(IGameServer gameServer, IMod mod)
     {
         DialogParameters parameters = new();
+        parameters.Add("GameServer", gameServer);
         parameters.Add("Mod", mod);
 
         DialogOptions options = new()
-            {
-                MaxWidth = MaxWidth.Small,
-                FullWidth = true,
-                CloseButton = true,
-                CloseOnEscapeKey = true,
-            };
+        {
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true,
+            CloseButton = true,
+            CloseOnEscapeKey = true,
+        };
 
         IDialogReference dialogReference = DialogService.Show<ModDialog>($"Install {mod.Name}", parameters, options);
         DialogResult dialogResult = await dialogReference.Result;
 
-        if (dialogResult.Cancelled)
+        if (dialogResult.Canceled)
         {
             return;
         }
@@ -194,6 +201,7 @@
     private async Task UpdateMod(IGameServer gameServer, IMod mod)
     {
         DialogParameters parameters = new();
+        parameters.Add("GameServer", gameServer);
         parameters.Add("Mod", mod);
 
         DialogOptions options = new()
@@ -207,7 +215,7 @@
         IDialogReference dialogReference = DialogService.Show<ModDialog>($"Update {mod.Name}", parameters, options);
         DialogResult dialogResult = await dialogReference.Result;
 
-        if (dialogResult.Cancelled)
+        if (dialogResult.Canceled)
         {
             return;
         }
@@ -227,6 +235,7 @@
     private async Task DeleteMod(IGameServer gameServer, IMod mod)
     {
         DialogParameters parameters = new();
+        parameters.Add("GameServer", gameServer);
         parameters.Add("Mod", mod);
 
         DialogOptions options = new()
@@ -240,7 +249,7 @@
         IDialogReference dialogReference = DialogService.Show<ModDialog>($"Delete {mod.Name}", parameters, options);
         DialogResult dialogResult = await dialogReference.Result;
 
-        if (dialogResult.Cancelled)
+        if (dialogResult.Canceled)
         {
             return;
         }

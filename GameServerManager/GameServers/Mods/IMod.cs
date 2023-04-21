@@ -1,4 +1,5 @@
 ﻿using GameServerManager.GameServers.Components;
+using GameServerManager.GameServers.Configs;
 
 namespace GameServerManager.GameServers.Mods
 {
@@ -10,7 +11,7 @@ namespace GameServerManager.GameServers.Mods
 
         public Type ConfigType { get; }
 
-        public string GetLocalVersion(IGameServer gameServer);
+        public IModConfig GetModConfig(IGameServer gameServer);
 
         public Task Install(IGameServer gameServer, string version);
 

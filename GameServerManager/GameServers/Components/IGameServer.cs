@@ -374,13 +374,13 @@ namespace GameServerManager.GameServers.Components
                 throw;
             }
 
-            Logger.Information($"{mod.Name} installed ({mod.GetLocalVersion(this)})");
+            Logger.Information($"{mod.Name} installed ({mod.GetModConfig(this).LocalVersion})");
             UpdateStatus(Status.Stopped);
         }
 
         public async Task UpdateModAsync(IMod mod, string version)
         {
-            Logger.Information($"{mod.Name} updating... ({mod.GetLocalVersion(this)}) => ({version})");
+            Logger.Information($"{mod.Name} updating... ({mod.GetModConfig(this).LocalVersion}) => ({version})");
             UpdateStatus(Status.UpdatingMod);
 
             try
@@ -395,7 +395,7 @@ namespace GameServerManager.GameServers.Components
                 throw;
             }
 
-            Logger.Information($"{mod.Name} updated ({mod.GetLocalVersion(this)})");
+            Logger.Information($"{mod.Name} updated ({mod.GetModConfig(this).LocalVersion})");
             UpdateStatus(Status.Stopped);
         }
 

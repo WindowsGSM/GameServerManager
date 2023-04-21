@@ -26,6 +26,15 @@
                     }
                 }
             </MudSelect>
+
+            @foreach (PropertyInfo tab in Mod.GetModConfig(GameServer).GetType().GetProperties())
+            {
+                @if (tab.TryGetCustomAttribute<TabPanelAttribute>(out TabPanelAttribute? tabPanel) && tabPanel.Text == "Install")
+                {
+                    <MudText Typo="Typo.subtitle1" Class="my-4">@tabPanel.Description</MudText>
+                    <MudFieldBuilder Tab="tab" Config="Mod.GetModConfig(GameServer)" GameServer="GameServer" />
+                }
+            }
         }
     </DialogContent>
     <DialogActions>
@@ -37,6 +46,9 @@
 @code {
     [CascadingParameter]
     public MudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public IGameServer GameServer { get; set; } = null!;
 
     [Parameter]
     public IMod Mod { get; set; } = null!;

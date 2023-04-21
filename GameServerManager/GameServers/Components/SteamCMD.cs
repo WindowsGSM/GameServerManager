@@ -10,6 +10,8 @@ using GameServerManager.Services;
 using GameServerManager.Utilities;
 using static GameServerManager.Services.GameServerService;
 using System.Text.Json;
+using static GameServerManager.Services.ContentVersionService;
+using System.Xml.Linq;
 
 namespace GameServerManager.GameServers.Components
 {
@@ -230,6 +232,30 @@ namespace GameServerManager.GameServers.Components
             }
 
             return "Unknown";
+        }
+
+        public static IContentVersion GetContentVersion(IGameServer gameServer)
+        {
+            SteamCMDConfig steamCMD = ((ISteamCMDConfig)gameServer.Config).SteamCMD;
+
+            if (Branches.TryGetValue(steamCMD.AppId, out Dictionary<string, Branch>? branches))
+            {
+                string name = string.IsNullOrWhiteSpace(steamCMD.BetaName) ? branches.First().Key : steamCMD.BetaName;
+
+                if (branches.ContainsKey(name))
+                {
+                    return new ContentVersion()
+                    {
+                        Versions = new()
+                        {
+                            branches[name].BuildId
+                        },
+                        Branch = name
+                    };
+                }
+            }
+
+            return new ContentVersion();
         }
 
         public static async Task FetchBranches()

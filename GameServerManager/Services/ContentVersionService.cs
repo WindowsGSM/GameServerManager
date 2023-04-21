@@ -16,6 +16,8 @@ namespace GameServerManager.Services
             public DateTime DateTime { get; set; }
 
             public string LatestVersion => Versions.Count <= 0 ? string.Empty : Versions[0];
+
+            public string? Branch { get; set; }
         }
 
         public class ContentVersion : IContentVersion
@@ -23,6 +25,8 @@ namespace GameServerManager.Services
             public List<string> Versions { get; set; } = new();
 
             public DateTime DateTime { get; set; } = DateTime.Now;
+
+            public string? Branch { get; set; }
         }
 
         public static ConcurrentDictionary<Type, IContentVersion> Versions { get; private set; } = new();
@@ -52,7 +56,7 @@ namespace GameServerManager.Services
         {
             if (typeof(ISteamCMDConfig).IsAssignableFrom(gameServer.Config.GetType()))
             {
-                return new ContentVersion() { Versions = new() { GetRemoteBuildId(gameServer) } };
+                return SteamCMD.GetContentVersion(gameServer);
             }
             else
             {

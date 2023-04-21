@@ -20,12 +20,12 @@ namespace GameServerManager.GameServers.Mods
 
         public Type ConfigType => typeof(IMetaModConfig);
 
-        public class Config
+        public class Config : IModConfig
         {
             public string LocalVersion { get; set; } = string.Empty;
         }
 
-        public string GetLocalVersion(IGameServer gameServer) => ((IMetaModConfig)gameServer.Config).MetaMod.LocalVersion;
+        public IModConfig GetModConfig(IGameServer gameServer) => ((IMetaModConfig)gameServer.Config).MetaMod;
 
         public async Task<List<string>> GetVersions()
         {

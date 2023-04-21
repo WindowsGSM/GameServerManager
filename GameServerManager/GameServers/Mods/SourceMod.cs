@@ -26,14 +26,16 @@ namespace GameServerManager.GameServers.Mods
             public string Path { get; set; } = "addons/sourcemod";
         }
 
-        public class Config
+        public class Config : IModConfig
         {
             public string LocalVersion { get; set; } = string.Empty;
 
+            // For future fork server
+            // [TabPanel(Text = "Install", Description = "Install Configuration")]
             public InstallConfig Install { get; set; } = new();
         }
 
-        public string GetLocalVersion(IGameServer gameServer) => ((ISourceModConfig)gameServer.Config).SourceMod.LocalVersion;
+        public IModConfig GetModConfig(IGameServer gameServer) => ((ISourceModConfig)gameServer.Config).SourceMod;
 
         public async Task<List<string>> GetVersions()
         {
